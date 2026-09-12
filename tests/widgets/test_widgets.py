@@ -119,16 +119,45 @@ def test_images_dialog_can_unload_and_reload_multiple_images(view):
     scene.items_by_type.return_value = images
     dialog = ImagesDialog(view, scene)
 
-    dialog.image_list.item(0).setSelected(True)
-    dialog.image_list.item(1).setSelected(True)
+    dialog.image_grid.selectRow(0)
+    dialog.image_grid.selectionModel().select(
+        dialog.image_grid.model().index(2, 0),
+        QtCore.QItemSelectionModel.SelectionFlag.Select
+        | QtCore.QItemSelectionModel.SelectionFlag.Rows)
     assert dialog.unload_button.isEnabled()
     dialog.unload_current()
     images[0].unload_image.assert_called_once_with()
     images[1].unload_image.assert_called_once_with()
 
-    dialog.image_list.item(2).setSelected(True)
+    dialog.image_grid.clearSelection()
+    dialog.image_grid.selectRow(2)
     dialog.reload_current()
     images[2].reload_image.assert_called_once_with()
+
+
+def test_images_dialog_filters_by_filename_and_status(view):
+    images = []
+    for filename, loaded in (('alpha.png', True), ('beta.png', False)):
+        image = MagicMock(
+            filename=filename,
+            image_loaded=loaded,
+            save_id=1,
+            image_source='scene.bee',
+        )
+        images.append(image)
+
+    scene = MagicMock()
+    scene.items_by_type.return_value = images
+    dialog = ImagesDialog(view, scene)
+
+    dialog.filename_filter.setText('alpha')
+    assert dialog.image_grid.rowCount() == 1
+    assert dialog.image_grid.item(0, 1).text() == 'alpha.png'
+
+    dialog.filename_filter.clear()
+    dialog.status_filter.setCurrentIndex(2)
+    assert dialog.image_grid.rowCount() == 1
+    assert dialog.image_grid.item(0, 1).text() == 'beta.png'
 
 
 @patch('PyQt6.QtCore.QTimer.singleShot')

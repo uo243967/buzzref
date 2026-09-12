@@ -284,12 +284,41 @@ class ImagesDialog(QtWidgets.QDialog):
         self.resize(500, 300)
 
         layout = QtWidgets.QVBoxLayout(self)
-        self.image_list = QtWidgets.QListWidget()
-        self.image_list.setSelectionMode(
+        filters = QtWidgets.QHBoxLayout()
+        filters.addWidget(QtWidgets.QLabel(self.tr('Filename:')))
+        self.filename_filter = QtWidgets.QLineEdit()
+        self.filename_filter.setPlaceholderText(
+            self.tr('Filter by filename'))
+        self.filename_filter.textChanged.connect(self.refresh)
+        filters.addWidget(self.filename_filter)
+        filters.addWidget(QtWidgets.QLabel(self.tr('Status:')))
+        self.status_filter = QtWidgets.QComboBox()
+        self.status_filter.addItem(self.tr('All'), 'all')
+        self.status_filter.addItem(self.tr('Loaded'), 'loaded')
+        self.status_filter.addItem(self.tr('Unloaded'), 'unloaded')
+        self.status_filter.currentIndexChanged.connect(self.refresh)
+        filters.addWidget(self.status_filter)
+        layout.addLayout(filters)
+
+        self.image_grid = QtWidgets.QTableWidget(0, 3)
+        self.image_grid.setHorizontalHeaderLabels(
+            [self.tr('#'), self.tr('Filename'), self.tr('Status')])
+        self.image_grid.setSelectionMode(
             QtWidgets.QAbstractItemView.SelectionMode.ExtendedSelection)
-        self.image_list.itemSelectionChanged.connect(
+        self.image_grid.setSelectionBehavior(
+            QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
+        self.image_grid.setSortingEnabled(True)
+        self.image_grid.setEditTriggers(
+            QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
+        header = self.image_grid.horizontalHeader()
+        assert header is not None
+        header.setStretchLastSection(True)
+        header.setSortIndicator(1, QtCore.Qt.SortOrder.AscendingOrder)
+        self.image_grid.itemSelectionChanged.connect(
             self.on_selection_changed)
-        layout.addWidget(self.image_list)
+        layout.addWidget(self.image_grid)
+        # Keep the old attribute available to integrations using the dialog.
+        self.image_list = self.image_grid
 
         buttons = QtWidgets.QHBoxLayout()
         self.unload_button = QtWidgets.QPushButton(self.tr('Unload'))
@@ -310,29 +339,47 @@ class ImagesDialog(QtWidgets.QDialog):
         self.show()
 
     def refresh(self):
-        selected_rows = {
-            self.image_list.row(item)
-            for item in self.image_list.selectedItems()
-        }
+        selected_images = set(self.selected_images())
+        filename_query = self.filename_filter.text().casefold()
+        status = self.status_filter.currentData()
         self.image_items = list(self.scene.items_by_type('pixmap'))
-        self.image_list.blockSignals(True)
-        self.image_list.clear()
-        for index, item in enumerate(self.image_items, start=1):
+        filtered_images = [
+            item for item in self.image_items
+            if filename_query in (item.filename or '').casefold()
+            and (status == 'all'
+                 or status == ('loaded' if item.image_loaded else 'unloaded'))
+        ]
+
+        self.image_grid.blockSignals(True)
+        self.image_grid.setSortingEnabled(False)
+        self.image_grid.setRowCount(0)
+        for row, item in enumerate(filtered_images):
             filename = item.filename or self.tr('(unnamed image)')
-            status = (self.tr('loaded') if item.image_loaded
-                      else self.tr('unloaded'))
-            list_item = QtWidgets.QListWidgetItem(
-                self.tr('%s. %s [%s]') % (index, filename, status))
-            self.image_list.addItem(list_item)
-            if index - 1 in selected_rows:
-                list_item.setSelected(True)
-        self.image_list.blockSignals(False)
+            item_status = (self.tr('Loaded') if item.image_loaded
+                           else self.tr('Unloaded'))
+            self.image_grid.insertRow(row)
+            number = QtWidgets.QTableWidgetItem(str(row + 1))
+            number.setData(QtCore.Qt.ItemDataRole.UserRole, id(item))
+            name = QtWidgets.QTableWidgetItem(filename)
+            name.setData(QtCore.Qt.ItemDataRole.UserRole, id(item))
+            state = QtWidgets.QTableWidgetItem(item_status)
+            state.setData(QtCore.Qt.ItemDataRole.UserRole, id(item))
+            self.image_grid.setItem(row, 0, number)
+            self.image_grid.setItem(row, 1, name)
+            self.image_grid.setItem(row, 2, state)
+            if item in selected_images:
+                self.image_grid.selectRow(row)
+        self.image_grid.setSortingEnabled(True)
+        self.image_grid.blockSignals(False)
         self.on_selection_changed()
 
     def selected_images(self):
+        item_by_id = {id(item): item for item in self.image_items}
+        rows = {index.row() for index in self.image_grid.selectedIndexes()}
         return [
-            self.image_items[self.image_list.row(list_item)]
-            for list_item in self.image_list.selectedItems()
+            item_by_id[self.image_grid.item(row, 0).data(
+                QtCore.Qt.ItemDataRole.UserRole)]
+            for row in rows
         ]
 
     def on_selection_changed(self):
