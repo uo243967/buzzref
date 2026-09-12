@@ -69,12 +69,13 @@ Features
 --------
 
 * Move, scale, rotate, crop and flip images
-* **NEW:** Sketch directly on the canvas with pressure-sensitive drawing
-* **NEW:** Move crop rectangles before applying
+* Sketch directly on the canvas with pressure-sensitive drawing
+* Move crop rectangles before applying
 * Mass-scale images to the same width, height or size
 * Mass-arrange images vertically, horizontally or for optimal usage of space
 * Add text notes
 * Enable always-on-top-mode and disable the title bar to let the window unobtrusively float above your art program
+* **NEW** Adjust opacity of window background (View -> Window Opacity)
 
 
 Regarding the bee file format

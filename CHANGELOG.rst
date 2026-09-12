@@ -27,6 +27,9 @@ Added
   crop rectagle or double click inside the crop rectangle. Canceling
   the crop operation is now only possible by pressing the escape key.
   (by DarkDefender)
+* Added a setting to change the window background opacity. It allows
+  users to overlap BuzzRef with other applications and see through it. 
+  The setting can be found in: "View -> Window Opacity"
 
 Fixed
 -----
