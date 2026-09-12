@@ -161,11 +161,36 @@ def test_images_dialog_filters_by_filename_and_status(view):
     dialog.filename_filter.setText('alpha')
     assert dialog.image_grid.rowCount() == 1
     assert dialog.image_grid.item(0, 1).text() == 'alpha.png'
+    assert dialog.image_grid.item(0, 2).text() == 'alpha.png'
 
     dialog.filename_filter.clear()
     dialog.status_filter.setCurrentIndex(2)
     assert dialog.image_grid.rowCount() == 1
     assert dialog.image_grid.item(0, 1).text() == 'beta.png'
+
+
+def test_images_dialog_name_column_is_sortable_and_filterable(view):
+    images = []
+    for filename in ('/tmp/zeta.png', '/tmp/alpha.png'):
+        image = MagicMock(
+            filename=filename,
+            image_loaded=True,
+            save_id=1,
+            image_source='scene.bee',
+        )
+        images.append(image)
+
+    scene = MagicMock()
+    scene.items_by_type.return_value = images
+    dialog = ImagesDialog(view, scene)
+
+    assert dialog.image_grid.columnCount() == 4
+    assert dialog.image_grid.horizontalHeaderItem(1).text() == 'Name'
+    dialog.image_grid.sortItems(1, QtCore.Qt.SortOrder.AscendingOrder)
+    assert dialog.image_grid.item(0, 1).text() == 'alpha.png'
+    dialog.filename_filter.setText('zeta.png')
+    assert dialog.image_grid.rowCount() == 1
+    assert dialog.image_grid.item(0, 1).text() == 'zeta.png'
 
 
 @patch('PyQt6.QtCore.QTimer.singleShot')

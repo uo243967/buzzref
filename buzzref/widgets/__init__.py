@@ -302,9 +302,10 @@ class ImagesDialog(QtWidgets.QDialog):
         filters.addWidget(self.status_filter)
         layout.addLayout(filters)
 
-        self.image_grid = QtWidgets.QTableWidget(0, 3)
+        self.image_grid = QtWidgets.QTableWidget(0, 4)
         self.image_grid.setHorizontalHeaderLabels(
-            [self.tr('#'), self.tr('Filename'), self.tr('Status')])
+            [self.tr('#'), self.tr('Name'), self.tr('Filename'),
+             self.tr('Status')])
         self.image_grid.setSelectionMode(
             QtWidgets.QAbstractItemView.SelectionMode.ExtendedSelection)
         self.image_grid.setSelectionBehavior(
@@ -348,7 +349,9 @@ class ImagesDialog(QtWidgets.QDialog):
             'pixmap', include_unloaded=True))
         filtered_images = [
             item for item in self.image_items
-            if filename_query in (item.filename or '').casefold()
+            if (filename_query in (item.filename or '').casefold()
+                    or filename_query in os.path.basename(
+                        item.filename or '').casefold())
             and (status == 'all'
                  or status == ('loaded' if item.image_loaded else 'unloaded'))
         ]
@@ -358,18 +361,22 @@ class ImagesDialog(QtWidgets.QDialog):
         self.image_grid.setRowCount(0)
         for row, item in enumerate(filtered_images):
             filename = item.filename or self.tr('(unnamed image)')
+            name = os.path.basename(item.filename) if item.filename else filename
             item_status = (self.tr('Loaded') if item.image_loaded
                            else self.tr('Unloaded'))
             self.image_grid.insertRow(row)
             number = QtWidgets.QTableWidgetItem(str(row + 1))
             number.setData(QtCore.Qt.ItemDataRole.UserRole, id(item))
-            name = QtWidgets.QTableWidgetItem(filename)
-            name.setData(QtCore.Qt.ItemDataRole.UserRole, id(item))
+            name_item = QtWidgets.QTableWidgetItem(name)
+            name_item.setData(QtCore.Qt.ItemDataRole.UserRole, id(item))
+            filename_item = QtWidgets.QTableWidgetItem(filename)
+            filename_item.setData(QtCore.Qt.ItemDataRole.UserRole, id(item))
             state = QtWidgets.QTableWidgetItem(item_status)
             state.setData(QtCore.Qt.ItemDataRole.UserRole, id(item))
             self.image_grid.setItem(row, 0, number)
-            self.image_grid.setItem(row, 1, name)
-            self.image_grid.setItem(row, 2, state)
+            self.image_grid.setItem(row, 1, name_item)
+            self.image_grid.setItem(row, 2, filename_item)
+            self.image_grid.setItem(row, 3, state)
             if item in selected_images:
                 self.image_grid.selectRow(row)
         self.image_grid.setSortingEnabled(True)
