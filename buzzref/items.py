@@ -160,8 +160,46 @@ class BuzzPixmapItem(BuzzItemMixin, QtWidgets.QGraphicsPixmapItem):
     def grayscale(self, value):
         logger.debug('Setting grayscale for {self} to {value}')
         self._grayscale = value
+        if value is True:
+            # Using the grayscale image format to convert to grayscale
+            # loses an image's tranparency. So the straightworward
+            # following method gives us an ugly black replacement:
+            # img = img.convertToFormat(QtGui.QImage.Format.Format_Grayscale8)
 
-        self._grayscale_pixmap = None
+            # Instead, we will fill the background with the current
+            # canvas colour, so the issue is only visible if the image
+            # overlaps other images. The way we do it here only works
+            # as long as the canvas colour is itself grayscale,
+            # though.
+
+            img = QtGui.QImage(self.pixmap().size(),
+                               QtGui.QImage.Format.Format_Grayscale8)
+            img.fill(QtGui.QColor(*COLORS['Scene:Canvas']))
+            painter = QtGui.QPainter(img)
+            painter.drawPixmap(0, 0, self.pixmap())
+            painter.end()
+            del painter
+            self._grayscale_pixmap = QtGui.QPixmap.fromImage(img)
+            del img
+
+            # Alternative methods that have their own issues:
+            #
+            # 1. Use setAlphaChannel of the resulting grayscale
+            # image. How do we get the original alpha channel? Using
+            # the whole original image also takes color values into
+            # account, not just their alpha values.
+            #
+            # 2. QtWidgets.QGraphicsColorizeEffect() with black colour
+            # on the GraphicsItem. This applys to everything the paint
+            # method does, so the selection outline/handles will also
+            # be gray. setGraphicsEffect is only available on some
+            # widgets, so we can't apply it selectively.
+            #
+            # 3. Going through every pixel and doing it manually — bad
+            # performance.
+
+        else:
+            self._grayscale_pixmap = None
 
         self.update()
 
@@ -171,11 +209,15 @@ class BuzzPixmapItem(BuzzItemMixin, QtWidgets.QGraphicsPixmapItem):
             pm = self._grayscale_pixmap
         else:
             pm = self.pixmap()
-        img = pm.toImage()
 
-        color = img.pixelColor(int(ipos.x()), int(ipos.y()))
-        if color.alpha():
-            return color
+        if pm is not None:
+            img = pm.toImage()
+
+            color = img.pixelColor(int(ipos.x()), int(ipos.y()))
+            if color.alpha():
+                return color
+        else:
+            return None
 
     def bounding_rect_unselected(self):
         if self.crop_mode:
