@@ -280,6 +280,9 @@ class ImagesDialog(QtWidgets.QDialog):
     def __init__(self, parent, scene):
         super().__init__(parent)
         self.scene = scene
+        self.page_size = 50
+        self.current_page = 0
+        self.filtered_images = []
         self.image_items = list(scene.items_by_type(
             'pixmap', include_unloaded=True))
         self.setWindowTitle(self.tr('Images'))
@@ -287,6 +290,11 @@ class ImagesDialog(QtWidgets.QDialog):
 
         layout = QtWidgets.QVBoxLayout(self)
         filters = QtWidgets.QHBoxLayout()
+        filters.addWidget(QtWidgets.QLabel(self.tr('Name:')))
+        self.name_filter = QtWidgets.QLineEdit()
+        self.name_filter.setPlaceholderText(self.tr('Filter by name'))
+        self.name_filter.textChanged.connect(self.refresh)
+        filters.addWidget(self.name_filter)
         filters.addWidget(QtWidgets.QLabel(self.tr('Filename:')))
         self.filename_filter = QtWidgets.QLineEdit()
         self.filename_filter.setPlaceholderText(
@@ -302,10 +310,9 @@ class ImagesDialog(QtWidgets.QDialog):
         filters.addWidget(self.status_filter)
         layout.addLayout(filters)
 
-        self.image_grid = QtWidgets.QTableWidget(0, 4)
+        self.image_grid = QtWidgets.QTableWidget(0, 3)
         self.image_grid.setHorizontalHeaderLabels(
-            [self.tr('#'), self.tr('Name'), self.tr('Filename'),
-             self.tr('Status')])
+            [self.tr('Name'), self.tr('Filename'), self.tr('Status')])
         self.image_grid.setSelectionMode(
             QtWidgets.QAbstractItemView.SelectionMode.ExtendedSelection)
         self.image_grid.setSelectionBehavior(
@@ -317,9 +324,33 @@ class ImagesDialog(QtWidgets.QDialog):
         assert header is not None
         header.setStretchLastSection(True)
         header.setSortIndicator(1, QtCore.Qt.SortOrder.AscendingOrder)
+        header.sortIndicatorChanged.connect(self.on_sort_changed)
         self.image_grid.itemSelectionChanged.connect(
             self.on_selection_changed)
         layout.addWidget(self.image_grid)
+        pagination = QtWidgets.QHBoxLayout()
+        self.previous_page_button = QtWidgets.QPushButton(
+            self.tr('Previous'))
+        self.previous_page_button.clicked.connect(self.previous_page)
+        pagination.addWidget(self.previous_page_button)
+        pagination.addWidget(QtWidgets.QLabel(self.tr('Page:')))
+        self.page_number_input = QtWidgets.QSpinBox()
+        self.page_number_input.setRange(1, 1)
+        self.page_number_input.valueChanged.connect(self.on_page_changed)
+        pagination.addWidget(self.page_number_input)
+        self.page_label = QtWidgets.QLabel()
+        pagination.addWidget(self.page_label)
+        self.next_page_button = QtWidgets.QPushButton(self.tr('Next'))
+        self.next_page_button.clicked.connect(self.next_page)
+        pagination.addWidget(self.next_page_button)
+        pagination.addStretch()
+        pagination.addWidget(QtWidgets.QLabel(self.tr('Images per page:')))
+        self.page_size_input = QtWidgets.QSpinBox()
+        self.page_size_input.setRange(1, 10000)
+        self.page_size_input.setValue(self.page_size)
+        self.page_size_input.valueChanged.connect(self.on_page_size_changed)
+        pagination.addWidget(self.page_size_input)
+        layout.addLayout(pagination)
         # Keep the old attribute available to integrations using the dialog.
         self.image_list = self.image_grid
 
@@ -343,45 +374,93 @@ class ImagesDialog(QtWidgets.QDialog):
 
     def refresh(self):
         selected_images = set(self.selected_images())
+        name_query = self.name_filter.text().casefold()
         filename_query = self.filename_filter.text().casefold()
         status = self.status_filter.currentData()
         self.image_items = list(self.scene.items_by_type(
             'pixmap', include_unloaded=True))
-        filtered_images = [
+        self.filtered_images = [
             item for item in self.image_items
-            if (filename_query in (item.filename or '').casefold()
-                    or filename_query in os.path.basename(
-                        item.filename or '').casefold())
+            if name_query in os.path.basename(item.filename or '').casefold()
+            and filename_query in (item.filename or '').casefold()
             and (status == 'all'
                  or status == ('loaded' if item.image_loaded else 'unloaded'))
         ]
+        column = self.image_grid.horizontalHeader().sortIndicatorSection()
+        order = self.image_grid.horizontalHeader().sortIndicatorOrder()
+        self.filtered_images.sort(
+            key=lambda item: self.sort_value(item, column),
+            reverse=order == QtCore.Qt.SortOrder.DescendingOrder)
+        page_count = self.page_count()
+        self.current_page = min(self.current_page, page_count - 1)
+        start = self.current_page * self.page_size
+        page_images = self.filtered_images[start:start + self.page_size]
 
         self.image_grid.blockSignals(True)
         self.image_grid.setSortingEnabled(False)
         self.image_grid.setRowCount(0)
-        for row, item in enumerate(filtered_images):
+        for row, item in enumerate(page_images):
             filename = item.filename or self.tr('(unnamed image)')
             name = os.path.basename(item.filename) if item.filename else filename
             item_status = (self.tr('Loaded') if item.image_loaded
                            else self.tr('Unloaded'))
             self.image_grid.insertRow(row)
-            number = QtWidgets.QTableWidgetItem(str(row + 1))
-            number.setData(QtCore.Qt.ItemDataRole.UserRole, id(item))
             name_item = QtWidgets.QTableWidgetItem(name)
             name_item.setData(QtCore.Qt.ItemDataRole.UserRole, id(item))
             filename_item = QtWidgets.QTableWidgetItem(filename)
             filename_item.setData(QtCore.Qt.ItemDataRole.UserRole, id(item))
             state = QtWidgets.QTableWidgetItem(item_status)
             state.setData(QtCore.Qt.ItemDataRole.UserRole, id(item))
-            self.image_grid.setItem(row, 0, number)
-            self.image_grid.setItem(row, 1, name_item)
-            self.image_grid.setItem(row, 2, filename_item)
-            self.image_grid.setItem(row, 3, state)
+            self.image_grid.setItem(row, 0, name_item)
+            self.image_grid.setItem(row, 1, filename_item)
+            self.image_grid.setItem(row, 2, state)
             if item in selected_images:
                 self.image_grid.selectRow(row)
         self.image_grid.setSortingEnabled(True)
         self.image_grid.blockSignals(False)
+        self.page_number_input.blockSignals(True)
+        self.page_number_input.setRange(1, page_count)
+        self.page_number_input.setValue(self.current_page + 1)
+        self.page_number_input.blockSignals(False)
+        self.page_label.setText(self.tr('of %1').replace(
+            '%1', str(page_count)))
+        self.previous_page_button.setEnabled(self.current_page > 0)
+        self.next_page_button.setEnabled(self.current_page < page_count - 1)
         self.on_selection_changed()
+
+    def sort_value(self, item, column):
+        if column == 0:
+            return os.path.basename(item.filename or '').casefold()
+        if column == 1:
+            return (item.filename or '').casefold()
+        return 1 if item.image_loaded else 0
+
+    def on_sort_changed(self, column, order):
+        self.refresh()
+
+    def set_page(self, page):
+        page_count = self.page_count()
+        self.current_page = max(0, min(page, page_count - 1))
+        self.refresh()
+
+    def page_count(self):
+        return max(
+            1, (len(self.filtered_images) + self.page_size - 1)
+            // self.page_size)
+
+    def on_page_changed(self, page):
+        self.set_page(page - 1)
+
+    def on_page_size_changed(self, page_size):
+        self.page_size = page_size
+        self.current_page = 0
+        self.refresh()
+
+    def previous_page(self):
+        self.set_page(self.current_page - 1)
+
+    def next_page(self):
+        self.set_page(self.current_page + 1)
 
     def selected_images(self):
         item_by_id = {id(item): item for item in self.image_items}

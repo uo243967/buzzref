@@ -161,7 +161,6 @@ def test_images_dialog_filters_by_filename_and_status(view):
     dialog.filename_filter.setText('alpha')
     assert dialog.image_grid.rowCount() == 1
     assert dialog.image_grid.item(0, 1).text() == 'alpha.png'
-    assert dialog.image_grid.item(0, 2).text() == 'alpha.png'
 
     dialog.filename_filter.clear()
     dialog.status_filter.setCurrentIndex(2)
@@ -184,13 +183,106 @@ def test_images_dialog_name_column_is_sortable_and_filterable(view):
     scene.items_by_type.return_value = images
     dialog = ImagesDialog(view, scene)
 
-    assert dialog.image_grid.columnCount() == 4
-    assert dialog.image_grid.horizontalHeaderItem(1).text() == 'Name'
-    dialog.image_grid.sortItems(1, QtCore.Qt.SortOrder.AscendingOrder)
-    assert dialog.image_grid.item(0, 1).text() == 'alpha.png'
+    assert dialog.image_grid.columnCount() == 3
+    assert dialog.image_grid.horizontalHeaderItem(0).text() == 'Name'
+    dialog.image_grid.sortItems(0, QtCore.Qt.SortOrder.AscendingOrder)
+    assert dialog.image_grid.item(0, 0).text() == 'alpha.png'
     dialog.filename_filter.setText('zeta.png')
     assert dialog.image_grid.rowCount() == 1
-    assert dialog.image_grid.item(0, 1).text() == 'zeta.png'
+    assert dialog.image_grid.item(0, 0).text() == 'zeta.png'
+
+
+def test_images_dialog_filters_by_name(view):
+    images = []
+    for filename in ('/tmp/alpha.png', '/tmp/beta.png'):
+        images.append(MagicMock(
+            filename=filename,
+            image_loaded=True,
+            save_id=1,
+            image_source='scene.bee',
+        ))
+
+    scene = MagicMock()
+    scene.items_by_type.return_value = images
+    dialog = ImagesDialog(view, scene)
+
+    dialog.name_filter.setText('beta')
+
+    assert dialog.image_grid.rowCount() == 1
+    assert dialog.image_grid.item(0, 0).text() == 'beta.png'
+
+
+def test_images_dialog_paginates_images(view):
+    images = [
+        MagicMock(
+            filename=f'image-{index:03}.png',
+            image_loaded=True,
+            save_id=index,
+            image_source='scene.bee',
+        )
+        for index in range(3)
+    ]
+    scene = MagicMock()
+    scene.items_by_type.return_value = images
+    dialog = ImagesDialog(view, scene)
+    dialog.page_size = 2
+    dialog.refresh()
+
+    assert dialog.image_grid.rowCount() == 2
+    assert dialog.page_number_input.value() == 1
+    assert dialog.page_label.text() == 'of 2'
+    assert dialog.previous_page_button.isEnabled() is False
+    assert dialog.next_page_button.isEnabled() is True
+
+    dialog.next_page()
+    assert dialog.image_grid.rowCount() == 1
+    assert dialog.page_number_input.value() == 2
+    assert dialog.page_label.text() == 'of 2'
+    assert dialog.previous_page_button.isEnabled() is True
+    assert dialog.next_page_button.isEnabled() is False
+
+
+def test_images_dialog_page_size_is_customizable(view):
+    images = [
+        MagicMock(
+            filename=f'image-{index:03}.png',
+            image_loaded=True,
+            save_id=index,
+            image_source='scene.bee',
+        )
+        for index in range(3)
+    ]
+    scene = MagicMock()
+    scene.items_by_type.return_value = images
+    dialog = ImagesDialog(view, scene)
+
+    dialog.page_size_input.setValue(1)
+
+    assert dialog.page_size == 1
+    assert dialog.image_grid.rowCount() == 1
+    assert dialog.page_number_input.value() == 1
+    assert dialog.page_label.text() == 'of 3'
+
+
+def test_images_dialog_can_set_page_number(view):
+    images = [
+        MagicMock(
+            filename=f'image-{index:03}.png',
+            image_loaded=True,
+            save_id=index,
+            image_source='scene.bee',
+        )
+        for index in range(3)
+    ]
+    scene = MagicMock()
+    scene.items_by_type.return_value = images
+    dialog = ImagesDialog(view, scene)
+    dialog.page_size_input.setValue(1)
+
+    dialog.page_number_input.setValue(3)
+
+    assert dialog.current_page == 2
+    assert dialog.image_grid.item(0, 0).text() == 'image-002.png'
 
 
 @patch('PyQt6.QtCore.QTimer.singleShot')

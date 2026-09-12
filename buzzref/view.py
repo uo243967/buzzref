@@ -812,6 +812,7 @@ class BuzzGraphicsView(MainControlsMixin,
         self.welcome_overlay.hide()
         logger.debug('Entered draw mode')
 
+
     def exit_draw_mode(self, commit=True):
         logger.debug(f'Exiting draw mode, commit={commit}')
         if self.draw_item:
