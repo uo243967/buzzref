@@ -421,7 +421,33 @@ class BuzzGraphicsView(MainControlsMixin,
         ]
         command = commands.ChangeImageLoadState(images, unload=True)
         if command.items:
-            self.undo_stack.push(command)
+            self._start_image_load_state(command)
+
+    def _start_image_load_state(self, command):
+        self.worker = fileio.ThreadedIO(
+            fileio.prepare_image_load_state,
+            command.items, command.unload)
+        self.worker.finished.connect(
+            partial(self._on_image_load_state_finished, command))
+        self.progress = widgets.BuzzProgressDialog(
+            self.tr('Unloading images' if command.unload
+                    else 'Reloading images'),
+            worker=self.worker,
+            parent=self)
+        self.worker.start()
+
+    def _on_image_load_state_finished(self, command, filename, errors):
+        if errors or self.worker.canceled:
+            if errors:
+                QtWidgets.QMessageBox.warning(
+                    self,
+                    self.tr('Problem changing image state'),
+                    self.tr('Some images could not be processed.'))
+            return
+        command.image_data = getattr(self.worker, 'image_data', {})
+        command.redo()
+        command.ignore_first_redo = True
+        self.undo_stack.push(command)
 
     def on_action_crop(self):
         self.scene.crop_items()

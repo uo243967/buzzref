@@ -13,13 +13,14 @@
 # You should have received a copy of the GNU General Public License
 # along with BuzzRef.  If not, see <https://www.gnu.org/licenses/>.
 
+from functools import partial
 import logging
 import os
 
 from PyQt6 import QtCore, QtWidgets, QtGui
 from PyQt6.QtCore import Qt
 
-from buzzref import constants, commands
+from buzzref import constants, commands, fileio
 from buzzref.config import logfile_name, BuzzSettings
 from buzzref.widgets import (  # noqa: F401
     controls,
@@ -401,15 +402,40 @@ class ImagesDialog(QtWidgets.QDialog):
         command = commands.ChangeImageLoadState(
             self.selected_images(), unload=True)
         if command.items:
-            self.scene.undo_stack.push(command)
-            self.refresh()
+            self.start_image_load_state(command)
 
     def reload_current(self):
         command = commands.ChangeImageLoadState(
             self.selected_images(), unload=False)
         if command.items:
-            self.scene.undo_stack.push(command)
-            self.refresh()
+            self.start_image_load_state(command)
+
+    def start_image_load_state(self, command):
+        self.worker = fileio.ThreadedIO(
+            fileio.prepare_image_load_state,
+            command.items, command.unload)
+        self.worker.finished.connect(
+            partial(self.on_image_load_state_finished, command))
+        self.progress = BuzzProgressDialog(
+            self.tr('Unloading images' if command.unload
+                    else 'Reloading images'),
+            worker=self.worker,
+            parent=self)
+        self.worker.start()
+
+    def on_image_load_state_finished(self, command, filename, errors):
+        if errors or self.worker.canceled:
+            if errors:
+                QtWidgets.QMessageBox.warning(
+                    self,
+                    self.tr('Problem changing image state'),
+                    self.tr('Some images could not be processed.'))
+            return
+        command.image_data = getattr(self.worker, 'image_data', {})
+        command.redo()
+        command.ignore_first_redo = True
+        self.scene.undo_stack.push(command)
+        self.refresh()
 
 
 class ChangeWindowOpacityDialog(QtWidgets.QDialog):

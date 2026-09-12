@@ -103,7 +103,7 @@ def test_change_opacity_dialog_reject(view, item):
     assert len(stack) == 0
 
 
-def test_images_dialog_can_unload_and_reload_multiple_images(view):
+def test_images_dialog_can_unload_and_reload_multiple_images(view, qtbot):
     images = []
     for loaded in (True, True, False):
         image = MagicMock(
@@ -127,19 +127,20 @@ def test_images_dialog_can_unload_and_reload_multiple_images(view):
         | QtCore.QItemSelectionModel.SelectionFlag.Rows)
     assert dialog.unload_button.isEnabled()
     dialog.unload_current()
+    qtbot.waitUntil(lambda: images[0].unload_image.called)
     command = scene.undo_stack.push.call_args.args[0]
     assert isinstance(command, commands.ChangeImageLoadState)
-    command.redo()
     images[0].unload_image.assert_called_once_with()
     images[1].unload_image.assert_called_once_with()
 
     dialog.image_grid.clearSelection()
     dialog.image_grid.selectRow(2)
-    dialog.reload_current()
+    with patch('buzzref.fileio.load_image_data', return_value=b'data'):
+        dialog.reload_current()
+        qtbot.waitUntil(lambda: images[2].reload_image.called)
     command = scene.undo_stack.push.call_args.args[0]
     assert isinstance(command, commands.ChangeImageLoadState)
-    command.redo()
-    images[2].reload_image.assert_called_once_with()
+    images[2].reload_image.assert_called_once_with(b'data')
 
 
 def test_images_dialog_filters_by_filename_and_status(view):

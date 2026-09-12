@@ -73,7 +73,7 @@ def test_on_scene_changed_when_no_items(show_mock, view):
         assert view.get_scale() == 1
 
 
-def test_unload_selected_images(view):
+def test_unload_selected_images(view, qtbot):
     loaded = MagicMock(is_image=True, image_loaded=True)
     unloaded = MagicMock(is_image=True, image_loaded=True)
     text = MagicMock(is_image=False)
@@ -82,6 +82,7 @@ def test_unload_selected_images(view):
 
     view.on_action_unload_selected_images()
 
+    qtbot.waitUntil(lambda: loaded.unload_image.called)
     loaded.unload_image.assert_called_once_with()
     unloaded.unload_image.assert_called_once_with()
     text.unload_image.assert_not_called()

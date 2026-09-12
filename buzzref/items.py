@@ -320,15 +320,16 @@ class BuzzPixmapItem(BuzzItemMixin, QtWidgets.QGraphicsPixmapItem):
         self.update()
         return True
 
-    def reload_image(self):
+    def reload_image(self, image_data=None):
         """Restore pixels by reading them from the scene file."""
         if self.image_loaded:
             return True
         if self.save_id is None or self.image_source is None:
             return False
 
-        from buzzref.fileio.sql import load_image_data
-        image_data = load_image_data(self.image_source, self.save_id)
+        if image_data is None:
+            from buzzref.fileio.sql import load_image_data
+            image_data = load_image_data(self.image_source, self.save_id)
         if image_data is None:
             logger.warning(
                 f'Could not reload image {self.save_id} from '
