@@ -160,7 +160,7 @@ class BuzzPixmapItem(BuzzItemMixin, QtWidgets.QGraphicsPixmapItem):
     def grayscale(self, value):
         logger.debug('Setting grayscale for {self} to {value}')
         self._grayscale = value
-        #if value is False:
+        #if value is True:
             # Using the grayscale image format to convert to grayscale
             # loses an image's tranparency. So the straightworward
             # following method gives us an ugly black replacement:

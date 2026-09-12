@@ -67,6 +67,8 @@ class BuzzGraphicsView(MainControlsMixin,
 
         self.setBackgroundBrush(
             QtGui.QBrush(QtGui.QColor(*constants.COLORS['Scene:Canvas'])))
+        self.viewport().setAutoFillBackground(False)
+        self.viewport().setStyleSheet('background: transparent;')
         self.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing)
         self.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
 
@@ -379,6 +381,27 @@ class BuzzGraphicsView(MainControlsMixin,
             lambda item: item.is_image,
             self.scene.selectedItems(user_only=True)))
         widgets.ChangeOpacityDialog(self, images, self.undo_stack)
+
+    def set_window_opacity(self, opacity):
+        opacity = max(0.0, min(1.0, float(opacity)))
+        self.parent.setAttribute(
+            QtCore.Qt.WidgetAttribute.WA_TranslucentBackground,
+            opacity < 1.0)
+        canvas = QtGui.QColor(*constants.COLORS['Scene:Canvas'])
+        canvas.setAlphaF(canvas.alphaF() * opacity)
+        self.setBackgroundBrush(QtGui.QBrush(canvas))
+
+    def window_opacity(self):
+        canvas = self.backgroundBrush().color()
+        base = QtGui.QColor(*constants.COLORS['Scene:Canvas'])
+        return canvas.alphaF() / base.alphaF()
+
+    def on_action_change_window_opacity(self):
+        widgets.ChangeWindowOpacityDialog(
+            self,
+            self.settings,
+            self.set_window_opacity,
+            self.window_opacity())
 
     def on_action_grayscale(self, checked):
         images = list(filter(

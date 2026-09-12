@@ -471,7 +471,7 @@ class ActionsRegistry(QObject):
             Action(
                 id='change_window_opacity',
                 text=self.tr('&Change window opacity'),
-                callback='on_action_change_opacity',
+                callback='on_action_change_window_opacity',
             ),
             Action(
                 id='always_on_top',

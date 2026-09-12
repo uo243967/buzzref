@@ -23,7 +23,7 @@ CHANGED_SYMBOL = '✎'
 
 COLORS = {
     # Qt:
-    'Active:Base': (60, 60, 60, 20),
+    'Active:Base': (60, 60, 60),
     'Active:AlternateBase': (70, 70, 70),
     'Active:Window': (40, 40, 40),
     'Active:Button': (40, 40, 40),
@@ -42,6 +42,6 @@ COLORS = {
 
     # BuzzRef specific:
     'Scene:Selection': (116, 234, 231),
-    'Scene:Canvas': (60, 60, 60, 20),
+    'Scene:Canvas': (60, 60, 60),
     'Scene:Text': (200, 200, 200),
 }

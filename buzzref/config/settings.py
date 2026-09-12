@@ -141,7 +141,12 @@ class BuzzSettings(QtCore.QSettings):
             'cast': int,
             'validate': lambda x: x >= 0,
             'post_save_callback': QtGui.QImageReader.setAllocationLimit,
-        }
+        },
+        'View/window_opacity': {
+            'default': 1.0,
+            'cast': float,
+            'validate': lambda x: 0.0 <= x <= 1.0,
+        },
     }
 
     def __init__(self):
