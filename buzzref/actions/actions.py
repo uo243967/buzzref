@@ -303,6 +303,12 @@ class ActionsRegistry(QObject):
                 group='active_when_selection',
             ),
             Action(
+                id='list_images',
+                text=self.tr('&List Images...'),
+                callback='on_action_list_images',
+                group='active_when_items_in_scene',
+            ),
+            Action(
                 id='show_color_gamut',
                 text=self.tr('Show &Color Gamut'),
                 callback='on_action_show_color_gamut',

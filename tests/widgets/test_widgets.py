@@ -9,6 +9,7 @@ from buzzref.widgets import (
     ChangeOpacityDialog,
     DebugLogDialog,
     ExportImagesFileExistsDialog,
+    ImagesDialog,
     SampleColorWidget,
     SceneToPixmapExporterDialog,
 )
@@ -99,6 +100,35 @@ def test_change_opacity_dialog_reject(view, item):
     dlg.reject()
     assert item.opacity() == 0.6
     assert len(stack) == 0
+
+
+def test_images_dialog_can_unload_and_reload_multiple_images(view):
+    images = []
+    for loaded in (True, True, False):
+        image = MagicMock(
+            filename=f'image-{len(images)}.png',
+            image_loaded=loaded,
+            save_id=len(images),
+            image_source='scene.bee',
+        )
+        image.unload_image.return_value = loaded
+        image.reload_image.return_value = not loaded
+        images.append(image)
+
+    scene = MagicMock()
+    scene.items_by_type.return_value = images
+    dialog = ImagesDialog(view, scene)
+
+    dialog.image_list.item(0).setSelected(True)
+    dialog.image_list.item(1).setSelected(True)
+    assert dialog.unload_button.isEnabled()
+    dialog.unload_current()
+    images[0].unload_image.assert_called_once_with()
+    images[1].unload_image.assert_called_once_with()
+
+    dialog.image_list.item(2).setSelected(True)
+    dialog.reload_current()
+    images[2].reload_image.assert_called_once_with()
 
 
 @patch('PyQt6.QtCore.QTimer.singleShot')

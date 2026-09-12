@@ -72,6 +72,16 @@ def handle_sqlite_errors(func):
     return wrapper
 
 
+def load_image_data(filename, item_id):
+    """Load one embedded image from a native scene file."""
+    uri = f'{pathlib.Path(filename).resolve().as_uri()}?mode=ro'
+    with sqlite3.connect(uri, uri=True) as connection:
+        row = connection.execute(
+            'SELECT data FROM sqlar WHERE item_id=?', (item_id,)
+        ).fetchone()
+    return row[0] if row else None
+
+
 class SQLiteIO:
 
     def __init__(self, filename, scene, create_new=False, readonly=False,
@@ -219,6 +229,7 @@ class SQLiteIO:
 
             if data['type'] == 'pixmap':
                 item = BuzzPixmapItem(QtGui.QImage())
+                item.image_source = self.filename
                 item.pixmap_from_bytes(row[9])
                 if item.pixmap().isNull():
                     item = data['data']['text'] = (

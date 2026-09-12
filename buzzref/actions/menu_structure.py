@@ -139,6 +139,7 @@ class MenuRegistry(QObject):
                     'change_opacity',
                     'grayscale',
                     MENU_SEPARATOR,
+                    'list_images',
                     'show_color_gamut',
                     'show_filename',
                     'sample_color',

@@ -411,6 +411,9 @@ class BuzzGraphicsView(MainControlsMixin,
             self.undo_stack.push(
                 commands.ToggleGrayscale(images, checked))
 
+    def on_action_list_images(self):
+        widgets.ImagesDialog(self, self.scene)
+
     def on_action_crop(self):
         self.scene.crop_items()
 
@@ -878,11 +881,21 @@ class BuzzGraphicsView(MainControlsMixin,
                         '<p>File/directory not accessible</p>') % filename)
         else:
             self.filename = filename
+            for item in self.scene.items_by_type('pixmap'):
+                item.image_source = filename
             self.undo_stack.setClean()
 
     def do_save(self, filename, create_new):
         if not fileio.is_bee_file(filename):
             filename = f'{filename}.bee'
+        if create_new:
+            for item in self.scene.items_by_type('pixmap'):
+                if not item.image_loaded and not item.reload_image():
+                    QtWidgets.QMessageBox.warning(
+                        self,
+                        self.tr('Problem saving file'),
+                        self.tr('An unloaded image could not be reloaded.'))
+                    return
         self.worker = fileio.ThreadedIO(
             fileio.save_bee, filename, self.scene, create_new=create_new)
         self.worker.finished.connect(self.on_saving_finished)

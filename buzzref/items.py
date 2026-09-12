@@ -118,6 +118,7 @@ class BuzzPixmapItem(BuzzItemMixin, QtWidgets.QGraphicsPixmapItem):
         super().__init__(QtGui.QPixmap.fromImage(image))
         self.save_id = None
         self.filename = filename
+        self.image_source = None
         self.reset_crop()
         logger.debug(f'Initialized {self}')
         self.is_image = True
@@ -287,6 +288,48 @@ class BuzzPixmapItem(BuzzItemMixin, QtWidgets.QGraphicsPixmapItem):
         pixmap = QtGui.QPixmap()
         pixmap.loadFromData(data)
         self.setPixmap(pixmap)
+
+    @property
+    def image_loaded(self):
+        """Whether the image pixels are currently held by the item."""
+        return not self.pixmap().isNull()
+
+    def unload_image(self):
+        """Release the pixmap so it can be restored from the scene file."""
+        if not self.image_loaded:
+            return False
+        if self.save_id is None or self.image_source is None:
+            logger.warning(
+                f'Cannot unload unsaved image without a scene file: {self}')
+            return False
+
+        crop = QtCore.QRectF(self.crop)
+        QtWidgets.QGraphicsPixmapItem.setPixmap(self, QtGui.QPixmap())
+        self._crop = crop
+        self._grayscale_pixmap = None
+        self.update()
+        return True
+
+    def reload_image(self):
+        """Restore pixels by reading them from the scene file."""
+        if self.image_loaded:
+            return True
+        if self.save_id is None or self.image_source is None:
+            return False
+
+        from buzzref.fileio.sql import load_image_data
+        image_data = load_image_data(self.image_source, self.save_id)
+        if image_data is None:
+            logger.warning(
+                f'Could not reload image {self.save_id} from '
+                f'{self.image_source}')
+            return False
+
+        crop = QtCore.QRectF(self.crop)
+        self.pixmap_from_bytes(image_data)
+        self._crop = crop
+        self.update()
+        return True
 
     def create_copy(self):
         item = BuzzPixmapItem(QtGui.QImage(), self.filename)

@@ -224,7 +224,7 @@ class SceneToPixmapExporterDialog(QtWidgets.QDialog):
 
 class ChangeOpacityDialog(QtWidgets.QDialog):
 
-    def __init__(self, parent, images, undo_stack):
+    def __init__(self, parent, images: list[QtWidgets.QGraphicsItem], undo_stack):
         super().__init__(parent)
         self.undo_stack = undo_stack
         self.images = images
@@ -272,6 +272,95 @@ class ChangeOpacityDialog(QtWidgets.QDialog):
     def reject(self):
         self.command.undo()
         return super().reject()
+
+
+class ImagesDialog(QtWidgets.QDialog):
+
+    def __init__(self, parent, scene):
+        super().__init__(parent)
+        self.scene = scene
+        self.image_items = list(scene.items_by_type('pixmap'))
+        self.setWindowTitle(self.tr('Images'))
+        self.resize(500, 300)
+
+        layout = QtWidgets.QVBoxLayout(self)
+        self.image_list = QtWidgets.QListWidget()
+        self.image_list.setSelectionMode(
+            QtWidgets.QAbstractItemView.SelectionMode.ExtendedSelection)
+        self.image_list.itemSelectionChanged.connect(
+            self.on_selection_changed)
+        layout.addWidget(self.image_list)
+
+        buttons = QtWidgets.QHBoxLayout()
+        self.unload_button = QtWidgets.QPushButton(self.tr('Unload'))
+        self.unload_button.clicked.connect(self.unload_current)
+        self.unload_button.setToolTip(
+            self.tr('Only images loaded from a saved scene can be unloaded.'))
+        buttons.addWidget(self.unload_button)
+        self.reload_button = QtWidgets.QPushButton(self.tr('Reload'))
+        self.reload_button.clicked.connect(self.reload_current)
+        buttons.addWidget(self.reload_button)
+        buttons.addStretch()
+        close_button = QtWidgets.QPushButton(self.tr('Close'))
+        close_button.clicked.connect(self.close)
+        buttons.addWidget(close_button)
+        layout.addLayout(buttons)
+
+        self.refresh()
+        self.show()
+
+    def refresh(self):
+        selected_rows = {
+            self.image_list.row(item)
+            for item in self.image_list.selectedItems()
+        }
+        self.image_items = list(self.scene.items_by_type('pixmap'))
+        self.image_list.blockSignals(True)
+        self.image_list.clear()
+        for index, item in enumerate(self.image_items, start=1):
+            filename = item.filename or self.tr('(unnamed image)')
+            status = (self.tr('loaded') if item.image_loaded
+                      else self.tr('unloaded'))
+            list_item = QtWidgets.QListWidgetItem(
+                self.tr('%s. %s [%s]') % (index, filename, status))
+            self.image_list.addItem(list_item)
+            if index - 1 in selected_rows:
+                list_item.setSelected(True)
+        self.image_list.blockSignals(False)
+        self.on_selection_changed()
+
+    def selected_images(self):
+        return [
+            self.image_items[self.image_list.row(list_item)]
+            for list_item in self.image_list.selectedItems()
+        ]
+
+    def on_selection_changed(self):
+        images = self.selected_images()
+        self.unload_button.setEnabled(
+            any(item.image_loaded
+                and item.save_id is not None
+                and item.image_source is not None
+                for item in images))
+        self.reload_button.setEnabled(
+            any(not item.image_loaded
+                and item.save_id is not None
+                and item.image_source is not None
+                for item in images))
+
+    def unload_current(self):
+        unloaded = False
+        for item in self.selected_images():
+            unloaded = item.unload_image() or unloaded
+        if unloaded:
+            self.refresh()
+
+    def reload_current(self):
+        reloaded = False
+        for item in self.selected_images():
+            reloaded = item.reload_image() or reloaded
+        if reloaded:
+            self.refresh()
 
 
 class ChangeWindowOpacityDialog(QtWidgets.QDialog):
