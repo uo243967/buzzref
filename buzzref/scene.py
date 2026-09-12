@@ -567,7 +567,13 @@ class BuzzGraphicsScene(QtWidgets.QGraphicsScene):
             item = cls.create_from_data(**data)
             # Set the values common to all item types:
             item.update_from_data(**data)
-            self.addItem(item)
+            unloaded = (getattr(item, 'is_image', False)
+                        and data.get('data', {}).get('unloaded', False))
+            if unloaded:
+                item.image_scene = self
+                self.unloaded_items.append(item)
+            else:
+                self.addItem(item)
             # Force recalculation of min/max z values:
             item.setZValue(item.zValue())
             if selected:

@@ -883,6 +883,9 @@ class BuzzGraphicsView(MainControlsMixin,
 
     def on_saving_finished(self, filename, errors):
         if errors:
+            for item in getattr(self, '_save_as_unloaded_items', []):
+                item.unload_image()
+            self._save_as_unloaded_items = []
             QtWidgets.QMessageBox.warning(
                 self,
                 self.tr('Problem saving file'),
@@ -890,20 +893,31 @@ class BuzzGraphicsView(MainControlsMixin,
                         '<p>File/directory not accessible</p>') % filename)
         else:
             self.filename = filename
-            for item in self.scene.items_by_type('pixmap'):
+            for item in self.scene.items_by_type(
+                    'pixmap', include_unloaded=True):
                 item.image_source = filename
+            for item in getattr(self, '_save_as_unloaded_items', []):
+                item.unload_image()
+            self._save_as_unloaded_items = []
             self.undo_stack.setClean()
 
     def do_save(self, filename, create_new):
         if not fileio.is_bee_file(filename):
             filename = f'{filename}.bee'
         if create_new:
-            for item in self.scene.items_by_type('pixmap'):
+            self._save_as_unloaded_items = [
+                item for item in self.scene.items_by_type(
+                    'pixmap', include_unloaded=True)
+                if not item.image_loaded
+            ]
+            for item in self.scene.items_by_type(
+                    'pixmap', include_unloaded=True):
                 if not item.image_loaded and not item.reload_image():
                     QtWidgets.QMessageBox.warning(
                         self,
                         self.tr('Problem saving file'),
                         self.tr('An unloaded image could not be reloaded.'))
+                    self._save_as_unloaded_items = []
                     return
         self.worker = fileio.ThreadedIO(
             fileio.save_bee, filename, self.scene, create_new=create_new)

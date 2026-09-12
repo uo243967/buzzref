@@ -228,13 +228,16 @@ class BuzzPixmapItem(BuzzItemMixin, QtWidgets.QGraphicsPixmapItem):
             return self.crop
 
     def get_extra_save_data(self):
-        return {'filename': self.filename,
+        data = {'filename': self.filename,
                 'opacity': self.opacity(),
                 'grayscale': self.grayscale,
                 'crop': [self.crop.topLeft().x(),
                          self.crop.topLeft().y(),
                          self.crop.width(),
                          self.crop.height()]}
+        if self.image_scene is not None and not self.image_loaded:
+            data['unloaded'] = True
+        return data
 
     def get_filename_for_export(self, imgformat, save_id_default=None):
         save_id = self.save_id or save_id_default

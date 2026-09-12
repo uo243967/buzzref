@@ -201,14 +201,14 @@ class SQLiteIO:
     @handle_sqlite_errors
     def read(self):
         rows = self.fetchall(
-            'SELECT items.id, type, x, y, z, scale, rotation, flip, '
-            'items.data, sqlar.data '
-            'FROM sqlar JOIN items on sqlar.item_id = items.id')
+            'SELECT id, type, x, y, z, scale, rotation, flip, data '
+            'FROM items '
+            'WHERE type = "pixmap"')
         # Avoid OUTER JOIN for performance reasons; fetch text items
         # separately instead
         rows.extend(self.fetchall(
             'SELECT items.id, type, x, y, z, scale, rotation, flip, '
-            ' items.data, null as data '
+            ' items.data '
             'FROM items '
             'WHERE items.type IN ("text", "path")'))
         if self.worker:
@@ -230,12 +230,17 @@ class SQLiteIO:
             if data['type'] == 'pixmap':
                 item = BuzzPixmapItem(QtGui.QImage())
                 item.image_source = self.filename
-                item.pixmap_from_bytes(row[9])
-                if item.pixmap().isNull():
-                    item = data['data']['text'] = (
-                        f'Image could not be loaded: {item.filename}\n'
-                        + IMG_LOADING_ERROR_MSG)
-                    data['type'] = BuzzErrorItem.TYPE
+                if not data['data'].get('unloaded', False):
+                    image_data = self.fetchone(
+                        'SELECT data FROM sqlar WHERE item_id=?',
+                        (data['save_id'],))
+                    item.pixmap_from_bytes(
+                        image_data[0] if image_data else b'')
+                    if item.pixmap().isNull():
+                        item = data['data']['text'] = (
+                            f'Image could not be loaded: {item.filename}\n'
+                            + IMG_LOADING_ERROR_MSG)
+                        data['type'] = BuzzErrorItem.TYPE
                 data['item'] = item
 
             self.scene.add_item_later(data)
