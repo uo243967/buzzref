@@ -172,7 +172,8 @@ export APPIMAGE_COMMAND=$(command -v -- "$ARGV0")
 export SSL_CERT_FILE="${APPDIR}/opt/_internal/certs.pem"
 """]
 
-runbee = f'"$APPDIR/{python_dir.removeprefix("squashfs-root/")}bin/{os.path.basename(python_executable)}" -I -m buzzref "$@"'
+runbee = f'"$APPDIR/{python_dir.removeprefix("squashfs-root/")}' \
+    'bin/{os.path.basename(python_executable)}" -I -m buzzref "$@"'
 logfile = '/tmp/BuzzRefAppimageLog.txt'
 
 content.extend([
