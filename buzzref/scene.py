@@ -49,6 +49,7 @@ class BuzzGraphicsScene(QtWidgets.QGraphicsScene):
         self.selectionChanged.connect(self.on_selection_change)
         self.changed.connect(self.on_change)
         self.items_to_add = Queue()
+        self.unloaded_items = []
         self.edit_item = None
         self.crop_item = None
         self.settings = BuzzSettings()
@@ -58,6 +59,7 @@ class BuzzGraphicsScene(QtWidgets.QGraphicsScene):
     def clear(self):
         self._clear_ongoing = True
         super().clear()
+        self.unloaded_items.clear()
         self.internal_clipboard = []
         self.rubberband_item = RubberbandItem()
         self.multi_select_item = MultiSelectItem()
@@ -440,7 +442,7 @@ class BuzzGraphicsScene(QtWidgets.QGraphicsScene):
         self.active_mode = None
         super().mouseReleaseEvent(event)
 
-    def selectedItems(self, user_only=False):
+    def selectedItems(self, user_only=False) -> list[QtWidgets.QGraphicsItem]:
         """If ``user_only`` is set to ``True``, only return items added
         by the user (i.e. no multi select outlines and other UI items).
 
@@ -452,11 +454,14 @@ class BuzzGraphicsScene(QtWidgets.QGraphicsScene):
             return list(filter(lambda i: hasattr(i, 'save_id'), items))
         return items
 
-    def items_by_type(self, itype):
+    def items_by_type(self, itype, include_unloaded=False):
         """Returns all items of the given type."""
 
+        items = list(self.items())
+        if include_unloaded:
+            items += self.unloaded_items
         return filter(lambda i: getattr(i, 'TYPE', None) == itype,
-                      self.items())
+                      items)
 
     def items_for_save(self):
 
@@ -465,8 +470,10 @@ class BuzzGraphicsScene(QtWidgets.QGraphicsScene):
         Items to be saved are items that have a save_id attribute.
         """
 
-        return filter(lambda i: hasattr(i, 'save_id'),
-                      self.items(order=Qt.SortOrder.AscendingOrder))
+        return filter(
+            lambda i: hasattr(i, 'save_id'),
+            list(self.items(order=Qt.SortOrder.AscendingOrder))
+            + self.unloaded_items)
 
     def clear_save_ids(self):
         for item in self.items_for_save():

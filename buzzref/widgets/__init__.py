@@ -279,7 +279,8 @@ class ImagesDialog(QtWidgets.QDialog):
     def __init__(self, parent, scene):
         super().__init__(parent)
         self.scene = scene
-        self.image_items = list(scene.items_by_type('pixmap'))
+        self.image_items = list(scene.items_by_type(
+            'pixmap', include_unloaded=True))
         self.setWindowTitle(self.tr('Images'))
         self.resize(500, 300)
 
@@ -342,7 +343,8 @@ class ImagesDialog(QtWidgets.QDialog):
         selected_images = set(self.selected_images())
         filename_query = self.filename_filter.text().casefold()
         status = self.status_filter.currentData()
-        self.image_items = list(self.scene.items_by_type('pixmap'))
+        self.image_items = list(self.scene.items_by_type(
+            'pixmap', include_unloaded=True))
         filtered_images = [
             item for item in self.image_items
             if filename_query in (item.filename or '').casefold()

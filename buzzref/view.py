@@ -90,7 +90,7 @@ class BuzzGraphicsView(MainControlsMixin,
         self.capture_start_pos = None
         self.capture_rubberband = None
 
-        self.scene = BuzzGraphicsScene(self.undo_stack)
+        self.scene: BuzzGraphicsScene = BuzzGraphicsScene(self.undo_stack)
         self.scene.changed.connect(self.on_scene_changed)
         self.scene.selectionChanged.connect(self.on_selection_changed)
         self.scene.cursor_changed.connect(self.on_cursor_changed)
@@ -171,7 +171,7 @@ class BuzzGraphicsView(MainControlsMixin,
     def on_scene_changed(self, region):
         if sip.isdeleted(self.scene):
             return
-        if not self.scene.items():
+        if not self.scene.items() and not self.scene.unloaded_items:
             logger.debug('No items in scene')
             self.setTransform(QtGui.QTransform())
             self.welcome_overlay.setFocus()

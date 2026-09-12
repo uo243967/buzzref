@@ -119,6 +119,7 @@ class BuzzPixmapItem(BuzzItemMixin, QtWidgets.QGraphicsPixmapItem):
         self.save_id = None
         self.filename = filename
         self.image_source = None
+        self.image_scene = None
         self.reset_crop()
         logger.debug(f'Initialized {self}')
         self.is_image = True
@@ -304,6 +305,12 @@ class BuzzPixmapItem(BuzzItemMixin, QtWidgets.QGraphicsPixmapItem):
             return False
 
         crop = QtCore.QRectF(self.crop)
+        scene = self.scene()
+        if scene is None:
+            return False
+        self.image_scene = scene
+        scene.unloaded_items.append(self)
+        scene.removeItem(self)
         QtWidgets.QGraphicsPixmapItem.setPixmap(self, QtGui.QPixmap())
         self._crop = crop
         self._grayscale_pixmap = None
@@ -328,6 +335,10 @@ class BuzzPixmapItem(BuzzItemMixin, QtWidgets.QGraphicsPixmapItem):
         crop = QtCore.QRectF(self.crop)
         self.pixmap_from_bytes(image_data)
         self._crop = crop
+        if self.image_scene is not None and self.scene() is None:
+            if self in self.image_scene.unloaded_items:
+                self.image_scene.unloaded_items.remove(self)
+            self.image_scene.addItem(self)
         self.update()
         return True
 
