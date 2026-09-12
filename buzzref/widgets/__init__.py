@@ -473,13 +473,14 @@ class ImagesDialog(QtWidgets.QDialog):
 
     def on_selection_changed(self):
         images = self.selected_images()
+        saved_scene = bool(getattr(self.parent(), 'filename', None))
         self.unload_button.setEnabled(
-            any(item.image_loaded
+            saved_scene and any(item.image_loaded
                 and item.save_id is not None
                 and item.image_source is not None
                 for item in images))
         self.reload_button.setEnabled(
-            any(not item.image_loaded
+            saved_scene and any(not item.image_loaded
                 and item.save_id is not None
                 and item.image_source is not None
                 for item in images))

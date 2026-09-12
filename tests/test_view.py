@@ -74,6 +74,7 @@ def test_on_scene_changed_when_no_items(show_mock, view):
 
 
 def test_unload_selected_images(view, qtbot):
+    view.filename = 'scene.bee'
     loaded = MagicMock(is_image=True, image_loaded=True)
     unloaded = MagicMock(is_image=True, image_loaded=True)
     text = MagicMock(is_image=False)
@@ -96,6 +97,10 @@ def test_unload_selected_images(view, qtbot):
 
 def test_unload_selected_images_shortcut(qapp):
     assert get_actions()['unload_selected_images'].shortcuts == ['U']
+
+
+def test_unload_selected_images_disabled_for_new_scene(view):
+    assert get_actions()['unload_selected_images'].qaction.isEnabled() is False
 
 
 def test_get_supported_image_formats_for_reading(view):

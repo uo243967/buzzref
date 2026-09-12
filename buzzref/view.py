@@ -124,6 +124,10 @@ class BuzzGraphicsView(MainControlsMixin,
     def filename(self, value):
         self._filename = value
         self.update_window_title()
+        if hasattr(self, 'bee_actiongroups'):
+            self.actiongroup_set_enabled(
+                'active_when_saved_selection',
+                bool(value) and self.scene.has_selection())
         if value:
             self.settings.update_recent_files(value)
             self.update_menu_and_actions()
@@ -415,6 +419,8 @@ class BuzzGraphicsView(MainControlsMixin,
         widgets.ImagesDialog(self, self.scene)
 
     def on_action_unload_selected_images(self):
+        if not self.filename:
+            return
         images = [
             item for item in self.scene.selectedItems(user_only=True)
             if getattr(item, 'is_image', False)
@@ -1207,6 +1213,9 @@ class BuzzGraphicsView(MainControlsMixin,
                      len(self.scene.selectedItems(user_only=True)))
         self.actiongroup_set_enabled('active_when_selection',
                                      self.scene.has_selection())
+        self.actiongroup_set_enabled(
+            'active_when_saved_selection',
+            bool(self.filename) and self.scene.has_selection())
         self.actiongroup_set_enabled('active_when_single_image',
                                      self.scene.has_single_image_selection())
 

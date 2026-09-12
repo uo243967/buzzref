@@ -313,7 +313,7 @@ class ActionsRegistry(QObject):
                 text=self.tr('&Unload Selected Images'),
                 shortcuts=['U'],
                 callback='on_action_unload_selected_images',
-                group='active_when_selection',
+                group='active_when_saved_selection',
             ),
             Action(
                 id='show_color_gamut',

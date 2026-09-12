@@ -104,6 +104,7 @@ def test_change_opacity_dialog_reject(view, item):
 
 
 def test_images_dialog_can_unload_and_reload_multiple_images(view, qtbot):
+    view.filename = 'scene.bee'
     images = []
     for loaded in (True, True, False):
         image = MagicMock(
@@ -210,6 +211,22 @@ def test_images_dialog_filters_by_name(view):
 
     assert dialog.image_grid.rowCount() == 1
     assert dialog.image_grid.item(0, 0).text() == 'beta.png'
+
+
+def test_images_dialog_disables_load_actions_for_new_scene(view):
+    images = [MagicMock(
+        filename='image.png',
+        image_loaded=True,
+        save_id=1,
+        image_source='scene.bee',
+    )]
+    scene = MagicMock()
+    scene.items_by_type.return_value = images
+    dialog = ImagesDialog(view, scene)
+    dialog.image_grid.selectRow(0)
+
+    assert dialog.unload_button.isEnabled() is False
+    assert dialog.reload_button.isEnabled() is False
 
 
 def test_images_dialog_paginates_images(view):
