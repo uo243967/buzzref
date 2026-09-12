@@ -85,6 +85,28 @@ def test_delete_items(view):
     assert item2.isSelected() is True
 
 
+def test_change_image_load_state():
+    loaded = MagicMock(is_image=True, image_loaded=True)
+    unloaded = MagicMock(is_image=True, image_loaded=False)
+    non_image = MagicMock(is_image=False, image_loaded=True)
+
+    command = commands.ChangeImageLoadState(
+        [loaded, unloaded, non_image], unload=True)
+    command.redo()
+    loaded.unload_image.assert_called_once_with()
+    unloaded.unload_image.assert_not_called()
+    command.undo()
+    loaded.reload_image.assert_called_once_with()
+
+    command = commands.ChangeImageLoadState(
+        [loaded, unloaded, non_image], unload=False)
+    command.redo()
+    unloaded.reload_image.assert_called_once_with()
+    command.undo()
+    unloaded.unload_image.assert_called_once_with()
+    loaded.unload_image.assert_called_once_with()
+
+
 def test_move_items_by(qapp):
     item1 = BuzzPixmapItem(QtGui.QImage())
     item1.setPos(0, 0)

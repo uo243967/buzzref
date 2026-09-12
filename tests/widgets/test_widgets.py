@@ -3,6 +3,7 @@ from unittest.mock import patch, MagicMock
 from PyQt6 import QtCore, QtWidgets, QtGui
 from PyQt6.QtCore import Qt
 
+from buzzref import commands
 from buzzref.config import logfile_name
 from buzzref.widgets import (
     BuzzNotification,
@@ -121,17 +122,23 @@ def test_images_dialog_can_unload_and_reload_multiple_images(view):
 
     dialog.image_grid.selectRow(0)
     dialog.image_grid.selectionModel().select(
-        dialog.image_grid.model().index(2, 0),
+        dialog.image_grid.model().index(1, 0),
         QtCore.QItemSelectionModel.SelectionFlag.Select
         | QtCore.QItemSelectionModel.SelectionFlag.Rows)
     assert dialog.unload_button.isEnabled()
     dialog.unload_current()
+    command = scene.undo_stack.push.call_args.args[0]
+    assert isinstance(command, commands.ChangeImageLoadState)
+    command.redo()
     images[0].unload_image.assert_called_once_with()
     images[1].unload_image.assert_called_once_with()
 
     dialog.image_grid.clearSelection()
     dialog.image_grid.selectRow(2)
     dialog.reload_current()
+    command = scene.undo_stack.push.call_args.args[0]
+    assert isinstance(command, commands.ChangeImageLoadState)
+    command.redo()
     images[2].reload_image.assert_called_once_with()
 
 

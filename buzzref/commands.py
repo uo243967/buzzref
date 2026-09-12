@@ -68,6 +68,31 @@ class DeleteItems(QtGui.QUndoCommand):
             self.scene.addItem(item)
 
 
+class ChangeImageLoadState(QtGui.QUndoCommand):
+    """Unload or reload images as an undoable operation."""
+
+    def __init__(self, items, unload):
+        super().__init__('Unload images' if unload else 'Reload images')
+        self.items = [
+            item for item in items
+            if getattr(item, 'is_image', False)
+            and item.image_loaded == unload
+        ]
+        self.unload = unload
+        self.changed_items = []
+
+    def redo(self):
+        operation = 'unload_image' if self.unload else 'reload_image'
+        self.changed_items = [
+            item for item in self.items if getattr(item, operation)()
+        ]
+
+    def undo(self):
+        operation = 'reload_image' if self.unload else 'unload_image'
+        for item in self.changed_items:
+            getattr(item, operation)()
+
+
 class MoveItemsBy(QtGui.QUndoCommand):
 
     def __init__(self, items, delta, ignore_first_redo=False):

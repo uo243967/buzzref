@@ -74,8 +74,8 @@ def test_on_scene_changed_when_no_items(show_mock, view):
 
 
 def test_unload_selected_images(view):
-    loaded = MagicMock(is_image=True)
-    unloaded = MagicMock(is_image=True)
+    loaded = MagicMock(is_image=True, image_loaded=True)
+    unloaded = MagicMock(is_image=True, image_loaded=True)
     text = MagicMock(is_image=False)
     view.scene.selectedItems = MagicMock(
         return_value=[loaded, unloaded, text])
@@ -85,6 +85,12 @@ def test_unload_selected_images(view):
     loaded.unload_image.assert_called_once_with()
     unloaded.unload_image.assert_called_once_with()
     text.unload_image.assert_not_called()
+    view.undo_stack.undo()
+    loaded.reload_image.assert_called_once_with()
+    unloaded.reload_image.assert_called_once_with()
+    view.undo_stack.redo()
+    assert loaded.unload_image.call_count == 2
+    assert unloaded.unload_image.call_count == 2
 
 
 def test_unload_selected_images_shortcut(qapp):

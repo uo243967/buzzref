@@ -419,8 +419,9 @@ class BuzzGraphicsView(MainControlsMixin,
             item for item in self.scene.selectedItems(user_only=True)
             if getattr(item, 'is_image', False)
         ]
-        for image in images:
-            image.unload_image()
+        command = commands.ChangeImageLoadState(images, unload=True)
+        if command.items:
+            self.undo_stack.push(command)
 
     def on_action_crop(self):
         self.scene.crop_items()

@@ -398,17 +398,17 @@ class ImagesDialog(QtWidgets.QDialog):
                 for item in images))
 
     def unload_current(self):
-        unloaded = False
-        for item in self.selected_images():
-            unloaded = item.unload_image() or unloaded
-        if unloaded:
+        command = commands.ChangeImageLoadState(
+            self.selected_images(), unload=True)
+        if command.items:
+            self.scene.undo_stack.push(command)
             self.refresh()
 
     def reload_current(self):
-        reloaded = False
-        for item in self.selected_images():
-            reloaded = item.reload_image() or reloaded
-        if reloaded:
+        command = commands.ChangeImageLoadState(
+            self.selected_images(), unload=False)
+        if command.items:
+            self.scene.undo_stack.push(command)
             self.refresh()
 
 
