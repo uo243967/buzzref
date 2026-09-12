@@ -50,7 +50,7 @@ args = parser.parse_args()
 
 
 BEEVERSION = args.version.removeprefix('v')
-APPIMAGE = 'python3.13.9-cp313-cp313-manylinux2014_x86_64.AppImage'
+APPIMAGE = 'python3.13.15-cp313-cp313-manylinux2014_x86_64.AppImage'
 # ^ Siehe:
 # https://python-appimage.readthedocs.io/en/latest/#alternative-site-packages-location
 PYVER = '3.13'
@@ -86,10 +86,25 @@ except FileNotFoundError:
 run_command('./python.appimage', '--appimage-extract',
             capture_output=True)
 
-run_command('squashfs-root/usr/bin/pip',
+python_dir = next(
+    path for path in glob.glob('squashfs-root/opt/python*/')
+    if os.path.isfile(os.path.join(path, 'bin', 'python3.13'))
+    or os.path.isfile(os.path.join(path, 'bin', 'python3.13t'))
+)
+python_executable = next(
+    path for path in (
+        os.path.join(python_dir, 'bin', 'python3.13'),
+        os.path.join(python_dir, 'bin', 'python3.13t'),
+    )
+    if os.path.isfile(path)
+)
+
+run_command(python_executable,
+            '-m',
+            'pip',
             'install',
             '.',
-            f'--target=squashfs-root/opt/python{PYVER}/lib/python{PYVER}/')
+            f'--target={python_dir}lib/python{PYVER}/')
 
 logger.info(f'Reading from: {args.jsonfile}')
 with open(args.jsonfile, 'r') as f:
@@ -157,7 +172,8 @@ export APPIMAGE_COMMAND=$(command -v -- "$ARGV0")
 export SSL_CERT_FILE="${APPDIR}/opt/_internal/certs.pem"
 """]
 
-runbee = f'"$APPDIR/opt/python{PYVER}/bin/python{PYVER}" -I -m buzzref "$@"'
+runbee = f'"$APPDIR/{python_dir.removeprefix("squashfs-root/")}' \
+    'bin/{os.path.basename(python_executable)}" -I -m buzzref "$@"'
 logfile = '/tmp/BuzzRefAppimageLog.txt'
 
 content.extend([
