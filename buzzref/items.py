@@ -160,7 +160,7 @@ class BuzzPixmapItem(BuzzItemMixin, QtWidgets.QGraphicsPixmapItem):
     def grayscale(self, value):
         logger.debug('Setting grayscale for {self} to {value}')
         self._grayscale = value
-        if value is True:
+        #if value is False:
             # Using the grayscale image format to convert to grayscale
             # loses an image's tranparency. So the straightworward
             # following method gives us an ugly black replacement:
@@ -171,13 +171,15 @@ class BuzzPixmapItem(BuzzItemMixin, QtWidgets.QGraphicsPixmapItem):
             # overlaps other images. The way we do it here only works
             # as long as the canvas colour is itself grayscale,
             # though.
-            img = QtGui.QImage(
-                self.pixmap().size(), QtGui.QImage.Format.Format_Grayscale8)
-            img.fill(QtGui.QColor(*COLORS['Scene:Canvas']))
-            painter = QtGui.QPainter(img)
-            painter.drawPixmap(0, 0, self.pixmap())
-            painter.end()
-            self._grayscale_pixmap = QtGui.QPixmap.fromImage(img)
+            
+            # img = QtGui.QImage(self.pixmap().size(), QtGui.QImage.Format.Format_Grayscale8)
+            # img.fill(QtGui.QColor(*COLORS['Scene:Canvas']))
+            # painter = QtGui.QPainter(img)
+            # painter.drawPixmap(0, 0, self.pixmap())
+            # painter.end()
+            # del painter
+            # self._grayscale_pixmap = QtGui.QPixmap.fromImage(img)
+            # del img
 
             # Alternative methods that have their own issues:
             #
@@ -194,8 +196,8 @@ class BuzzPixmapItem(BuzzItemMixin, QtWidgets.QGraphicsPixmapItem):
             #
             # 3. Going through every pixel and doing it manually — bad
             # performance.
-        else:
-            self._grayscale_pixmap = None
+        #else:
+        self._grayscale_pixmap = None
 
         self.update()
 
