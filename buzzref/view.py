@@ -414,6 +414,14 @@ class BuzzGraphicsView(MainControlsMixin,
     def on_action_list_images(self):
         widgets.ImagesDialog(self, self.scene)
 
+    def on_action_unload_selected_images(self):
+        images = [
+            item for item in self.scene.selectedItems(user_only=True)
+            if getattr(item, 'is_image', False)
+        ]
+        for image in images:
+            image.unload_image()
+
     def on_action_crop(self):
         self.scene.crop_items()
 

@@ -309,6 +309,13 @@ class ActionsRegistry(QObject):
                 group='active_when_items_in_scene',
             ),
             Action(
+                id='unload_selected_images',
+                text=self.tr('&Unload Selected Images'),
+                shortcuts=['U'],
+                callback='on_action_unload_selected_images',
+                group='active_when_selection',
+            ),
+            Action(
                 id='show_color_gamut',
                 text=self.tr('Show &Color Gamut'),
                 callback='on_action_show_color_gamut',
