@@ -25,6 +25,7 @@ from PyQt6 import QtCore, QtWidgets
 from PyQt6.QtCore import QTranslator, QLocale, QLibraryInfo, Qt
 
 from buzzref import constants
+from buzzref.actions import get_actions
 from buzzref.translations import TRANSLATIONS_PATH
 from buzzref.assets import BuzzAssets
 from buzzref.config import CommandlineArgs, BuzzSettings, logfile_name
@@ -68,7 +69,22 @@ class BuzzRefMainWindow(QtWidgets.QMainWindow):
         self.view.set_window_opacity(
             self.view.settings.valueOrDefault('View/window_opacity'))
         self.input_overlay = None
+        app.applicationStateChanged.connect(self.on_application_state_changed)
         self.show()
+
+    def on_application_state_changed(self, state):
+        if (state == QtCore.Qt.ApplicationState.ApplicationActive
+                and self.input_overlay is not None):
+            logger.info(
+                'BuzzRef became active; restoring the interactive main '
+                'window')
+            self.view.ignore_mouse_when_inactive = False
+            ignore_action = get_actions()[
+                'ignore_mouse_when_inactive'].qaction
+            ignore_action.blockSignals(True)
+            ignore_action.setChecked(False)
+            ignore_action.blockSignals(False)
+            self.set_input_overlay(False)
 
     def set_input_overlay(self, enabled):
         if not enabled:
@@ -89,6 +105,7 @@ class BuzzRefMainWindow(QtWidgets.QMainWindow):
         overlay.setWindowFlags(
             Qt.WindowType.FramelessWindowHint
             | Qt.WindowType.Tool
+            | Qt.WindowType.WindowStaysOnTopHint
             | Qt.WindowType.WindowDoesNotAcceptFocus
             | Qt.WindowType.WindowTransparentForInput)
         overlay.setAttribute(
@@ -97,9 +114,10 @@ class BuzzRefMainWindow(QtWidgets.QMainWindow):
         overlay.setGeometry(self.frameGeometry())
         overlay.show()
         self.input_overlay = overlay
-        self.hide()
+        self.showMinimized()
         logger.info(
-            'Mouse input overlay enabled at %s with size %s',
+            'Mouse input overlay enabled at %s with size %s; '
+            'main window minimized',
             overlay.pos(), overlay.size())
 
     def closeEvent(self, event):
