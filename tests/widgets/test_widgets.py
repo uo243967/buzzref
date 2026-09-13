@@ -184,13 +184,37 @@ def test_images_dialog_name_column_is_sortable_and_filterable(view):
     scene.items_by_type.return_value = images
     dialog = ImagesDialog(view, scene)
 
-    assert dialog.image_grid.columnCount() == 3
+    assert dialog.image_grid.columnCount() == 4
     assert dialog.image_grid.horizontalHeaderItem(0).text() == 'Name'
+    assert dialog.image_grid.horizontalHeaderItem(3).text() == 'Preview'
     dialog.image_grid.sortItems(0, QtCore.Qt.SortOrder.AscendingOrder)
     assert dialog.image_grid.item(0, 0).text() == 'alpha.png'
     dialog.filename_filter.setText('zeta.png')
     assert dialog.image_grid.rowCount() == 1
     assert dialog.image_grid.item(0, 0).text() == 'zeta.png'
+
+
+def test_images_dialog_preview_uses_downscaled_image(view):
+    image = QtGui.QImage(200, 100, QtGui.QImage.Format.Format_RGB32)
+    image.fill(QtGui.QColor('red'))
+    pixmap = QtGui.QPixmap.fromImage(image)
+    item = MagicMock(
+        filename='/tmp/image.png',
+        image_loaded=True,
+        save_id=1,
+        image_source='scene.bee',
+    )
+    item.pixmap.return_value = pixmap
+
+    scene = MagicMock()
+    scene.items_by_type.return_value = [item]
+    dialog = ImagesDialog(view, scene)
+
+    preview = dialog.image_grid.cellWidget(0, 3)
+    assert isinstance(preview, QtWidgets.QLabel)
+    assert preview.pixmap() is not None
+    assert preview.pixmap().isNull() is False
+    assert preview.pixmap().size() == QtCore.QSize(48, 24)
 
 
 def test_images_dialog_filters_by_name(view):

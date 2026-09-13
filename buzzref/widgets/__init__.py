@@ -311,9 +311,10 @@ class ImagesDialog(QtWidgets.QDialog):
         filters.addWidget(self.status_filter)
         layout.addLayout(filters)
 
-        self.image_grid = QtWidgets.QTableWidget(0, 3)
+        self.image_grid = QtWidgets.QTableWidget(0, 4)
         self.image_grid.setHorizontalHeaderLabels(
-            [self.tr('Name'), self.tr('Filename'), self.tr('Status')])
+            [self.tr('Name'), self.tr('Filename'), self.tr('Status'),
+             self.tr('Preview')])
         self.image_grid.setSelectionMode(
             QtWidgets.QAbstractItemView.SelectionMode.ExtendedSelection)
         self.image_grid.setSelectionBehavior(
@@ -417,9 +418,14 @@ class ImagesDialog(QtWidgets.QDialog):
             filename_item.setData(QtCore.Qt.ItemDataRole.UserRole, id(item))
             state = QtWidgets.QTableWidgetItem(item_status)
             state.setData(QtCore.Qt.ItemDataRole.UserRole, id(item))
+            preview = QtWidgets.QLabel()
+            preview.setPixmap(self.image_icon(item).pixmap(
+                QtCore.QSize(48, 48)))
+            preview.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
             self.image_grid.setItem(row, 0, name_item)
             self.image_grid.setItem(row, 1, filename_item)
             self.image_grid.setItem(row, 2, state)
+            self.image_grid.setCellWidget(row, 3, preview)
             if item in selected_images:
                 self.image_grid.selectRow(row)
         self.image_grid.setSortingEnabled(True)
@@ -440,6 +446,30 @@ class ImagesDialog(QtWidgets.QDialog):
         if column == 1:
             return (item.filename or '').casefold()
         return 1 if item.image_loaded else 0
+
+    def image_icon(self, item):
+        """Create a small preview without retaining the full image."""
+        pixmap = QtGui.QPixmap()
+        if item.image_loaded:
+            candidate = item.pixmap()
+            if isinstance(candidate, QtGui.QPixmap):
+                pixmap = candidate
+        elif (item.save_id is not None
+              and item.image_source is not None
+              and os.path.isfile(item.image_source)):
+            image_data = fileio.load_image_data(
+                item.image_source, item.save_id)
+            if image_data:
+                image = QtGui.QImage.fromData(image_data)
+                pixmap = QtGui.QPixmap.fromImage(image)
+
+        if pixmap.isNull():
+            return QtGui.QIcon()
+        thumbnail = pixmap.scaled(
+            QtCore.QSize(48, 48),
+            QtCore.Qt.AspectRatioMode.KeepAspectRatio,
+            QtCore.Qt.TransformationMode.SmoothTransformation)
+        return QtGui.QIcon(thumbnail)
 
     def on_sort_changed(self, column, order):
         self.refresh()
