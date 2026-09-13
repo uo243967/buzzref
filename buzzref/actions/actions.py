@@ -469,10 +469,10 @@ class ActionsRegistry(QObject):
                 callback='on_action_show_titlebar',
             ),
             Action(
-                id='ignore_mouse_when_inactive',
-                text=self.tr('Ignore Mouse Events When Inactive'),
+                id='transparent_to_mouse_events',
+                text=self.tr('Transparent to mouse events'),
                 checkable=True,
-                callback='on_action_ignore_mouse_when_inactive',
+                callback='on_action_transparent_to_mouse_events',
             ),
             Action(
                 id='move_window',

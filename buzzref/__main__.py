@@ -89,9 +89,9 @@ class BuzzRefMainWindow(QtWidgets.QMainWindow):
         logger.info(
             'BuzzRef became active; restoring the interactive main '
             'window')
-        self.view.ignore_mouse_when_inactive = False
+        self.view.transparent_to_mouse_events = False
         ignore_action = get_actions()[
-            'ignore_mouse_when_inactive'].qaction
+            'transparent_to_mouse_events'].qaction
         ignore_action.blockSignals(True)
         ignore_action.setChecked(False)
         ignore_action.blockSignals(False)
