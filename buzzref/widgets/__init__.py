@@ -274,6 +274,54 @@ class ChangeOpacityDialog(QtWidgets.QDialog):
         return super().reject()
 
 
+class ChangeWindowOpacityDialog(QtWidgets.QDialog):
+
+    def __init__(self, parent, buzz_settings, set_opacity, opacity):
+        super().__init__(parent)
+        self.buzz_settings = buzz_settings
+        self.set_opacity = set_opacity
+        self.previous_opacity = opacity
+        value = round(opacity * 100)
+
+        self.setWindowTitle(self.tr('Change Window Opacity:'))
+        self.setWindowModality(Qt.WindowModality.WindowModal)
+        layout = QtWidgets.QVBoxLayout()
+        self.setLayout(layout)
+
+        self.label = QtWidgets.QLabel()
+        layout.addWidget(self.label)
+
+        self.input = QtWidgets.QSlider(Qt.Orientation.Horizontal)
+        self.input.setRange(0, 100)
+        self.input.valueChanged.connect(self.on_value_changed)
+        self.input.setValue(value)
+        self.on_value_changed(value)
+        layout.addWidget(self.input)
+
+        buttons = QtWidgets.QDialogButtonBox(
+            QtWidgets.QDialogButtonBox.StandardButton.Ok |
+            QtWidgets.QDialogButtonBox.StandardButton.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+        self.show()
+
+    def on_value_changed(self, value):
+        self.label.setText(self.tr('Window opacity: %s%%') % value)
+        self.set_opacity(value / 100)
+
+    def accept(self):
+        self.previous_opacity = self.input.value() / 100
+        self.buzz_settings.setValue(
+            'View/window_opacity', self.previous_opacity)
+        return super().accept()
+
+    def reject(self):
+        self.set_opacity(self.previous_opacity)
+        return super().reject()
+
+
 class BuzzNotification(QtWidgets.QWidget):
     def __init__(self, parent, text):
         super().__init__(parent)

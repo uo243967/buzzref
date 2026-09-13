@@ -171,13 +171,16 @@ class BuzzPixmapItem(BuzzItemMixin, QtWidgets.QGraphicsPixmapItem):
             # overlaps other images. The way we do it here only works
             # as long as the canvas colour is itself grayscale,
             # though.
-            img = QtGui.QImage(
-                self.pixmap().size(), QtGui.QImage.Format.Format_Grayscale8)
+
+            img = QtGui.QImage(self.pixmap().size(),
+                               QtGui.QImage.Format.Format_Grayscale8)
             img.fill(QtGui.QColor(*COLORS['Scene:Canvas']))
             painter = QtGui.QPainter(img)
             painter.drawPixmap(0, 0, self.pixmap())
             painter.end()
+            del painter
             self._grayscale_pixmap = QtGui.QPixmap.fromImage(img)
+            del img
 
             # Alternative methods that have their own issues:
             #
@@ -194,6 +197,7 @@ class BuzzPixmapItem(BuzzItemMixin, QtWidgets.QGraphicsPixmapItem):
             #
             # 3. Going through every pixel and doing it manually — bad
             # performance.
+
         else:
             self._grayscale_pixmap = None
 
@@ -205,11 +209,15 @@ class BuzzPixmapItem(BuzzItemMixin, QtWidgets.QGraphicsPixmapItem):
             pm = self._grayscale_pixmap
         else:
             pm = self.pixmap()
-        img = pm.toImage()
 
-        color = img.pixelColor(int(ipos.x()), int(ipos.y()))
-        if color.alpha():
-            return color
+        if pm is not None:
+            img = pm.toImage()
+
+            color = img.pixelColor(int(ipos.x()), int(ipos.y()))
+            if color.alpha():
+                return color
+        else:
+            return None
 
     def bounding_rect_unselected(self):
         if self.crop_mode:

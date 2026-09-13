@@ -54,6 +54,8 @@ class BuzzRefMainWindow(QtWidgets.QMainWindow):
         app.setOrganizationName(constants.APPNAME)
         app.setApplicationName(constants.APPNAME)
         self.setWindowIcon(BuzzAssets().logo)
+        self.setAttribute(
+            QtCore.Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.view = BuzzGraphicsView(app, self)
         default_window_size = QtCore.QSize(500, 300)
         geom = self.view.settings.value('MainWindow/geometry')
@@ -63,6 +65,8 @@ class BuzzRefMainWindow(QtWidgets.QMainWindow):
             if not self.restoreGeometry(geom):
                 self.resize(default_window_size)
         self.setCentralWidget(self.view)
+        self.view.set_window_opacity(
+            self.view.settings.valueOrDefault('View/window_opacity'))
         self.show()
 
     def closeEvent(self, event):
