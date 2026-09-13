@@ -281,7 +281,7 @@ class ImagesDialog(QtWidgets.QDialog):
     def __init__(self, parent, scene):
         super().__init__(parent)
         self.scene = scene
-        self.page_size = 50
+        self.page_size = 5
         self.current_page = 0
         self.filtered_images = []
         self.image_items = list(scene.items_by_type(
