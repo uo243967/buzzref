@@ -279,6 +279,57 @@ def test_pixmap_from_bytes(qapp, item, imgfilename3x3):
     assert item.crop == QtCore.QRectF(0, 0, 3, 3)
 
 
+@patch('buzzref.fileio.sql.load_image_data')
+def test_unload_and_reload_image_preserves_crop(
+        load_image_data, view, imgfilename3x3):
+    item = BuzzPixmapItem(QtGui.QImage(imgfilename3x3), imgfilename3x3)
+    item.save_id = 42
+    item.image_source = 'scene.bee'
+    item.crop = QtCore.QRectF(0, 0, 2, 2)
+    view.scene.addItem(item)
+    with open(imgfilename3x3, 'rb') as image_file:
+        load_image_data.return_value = image_file.read()
+
+    assert item.unload_image() is True
+    assert item.image_loaded is False
+    assert item.pixmap().isNull()
+    assert item.crop == QtCore.QRectF(0, 0, 2, 2)
+
+    assert item.reload_image() is True
+    load_image_data.assert_called_once_with('scene.bee', 42)
+    assert item.image_loaded is True
+    assert item.pixmap().size() == QtCore.QSize(3, 3)
+    assert item.crop == QtCore.QRectF(0, 0, 2, 2)
+
+
+def test_unload_image_requires_saved_scene(qapp, imgfilename3x3):
+    item = BuzzPixmapItem(QtGui.QImage(imgfilename3x3))
+
+    assert item.unload_image() is False
+    assert item.unload_image() is False
+    assert item.reload_image() is False
+
+
+@patch('buzzref.fileio.sql.load_image_data')
+def test_unload_removes_item_from_scene_and_reload_restores_it(
+        load_image_data, view, imgfilename3x3):
+    item = BuzzPixmapItem(QtGui.QImage(imgfilename3x3))
+    item.save_id = 42
+    item.image_source = 'scene.bee'
+    view.scene.addItem(item)
+    with open(imgfilename3x3, 'rb') as image_file:
+        load_image_data.return_value = image_file.read()
+
+    assert item.unload_image() is True
+    assert item.scene() is None
+    assert item not in view.scene.items()
+    assert item in list(view.scene.items_for_save())
+
+    assert item.reload_image() is True
+    assert item.scene() is view.scene
+    assert item in view.scene.items()
+
+
 def test_has_selection_outline_when_not_selected(view, item):
     view.scene.addItem(item)
     item.setSelected(False)

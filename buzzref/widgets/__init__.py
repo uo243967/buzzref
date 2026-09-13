@@ -13,13 +13,14 @@
 # You should have received a copy of the GNU General Public License
 # along with BuzzRef.  If not, see <https://www.gnu.org/licenses/>.
 
+from functools import partial
 import logging
 import os
 
 from PyQt6 import QtCore, QtWidgets, QtGui
 from PyQt6.QtCore import Qt
 
-from buzzref import constants, commands
+from buzzref import constants, commands, fileio
 from buzzref.config import logfile_name, BuzzSettings
 from buzzref.widgets import (  # noqa: F401
     controls,
@@ -224,7 +225,8 @@ class SceneToPixmapExporterDialog(QtWidgets.QDialog):
 
 class ChangeOpacityDialog(QtWidgets.QDialog):
 
-    def __init__(self, parent, images, undo_stack):
+    def __init__(self, parent, images: list[QtWidgets.QGraphicsItem],
+                 undo_stack):
         super().__init__(parent)
         self.undo_stack = undo_stack
         self.images = images
@@ -272,6 +274,293 @@ class ChangeOpacityDialog(QtWidgets.QDialog):
     def reject(self):
         self.command.undo()
         return super().reject()
+
+
+class ImagesDialog(QtWidgets.QDialog):
+
+    def __init__(self, parent, scene):
+        super().__init__(parent)
+        self.scene = scene
+        self.page_size = 5
+        self.current_page = 0
+        self.filtered_images = []
+        self.image_items = list(scene.items_by_type(
+            'pixmap', include_unloaded=True))
+        self.setWindowTitle(self.tr('Images'))
+        self.resize(500, 300)
+
+        layout = QtWidgets.QVBoxLayout(self)
+        filters = QtWidgets.QHBoxLayout()
+        filters.addWidget(QtWidgets.QLabel(self.tr('Name:')))
+        self.name_filter = QtWidgets.QLineEdit()
+        self.name_filter.setPlaceholderText(self.tr('Filter by name'))
+        self.name_filter.textChanged.connect(self.refresh)
+        filters.addWidget(self.name_filter)
+        filters.addWidget(QtWidgets.QLabel(self.tr('Filename:')))
+        self.filename_filter = QtWidgets.QLineEdit()
+        self.filename_filter.setPlaceholderText(
+            self.tr('Filter by filename'))
+        self.filename_filter.textChanged.connect(self.refresh)
+        filters.addWidget(self.filename_filter)
+        filters.addWidget(QtWidgets.QLabel(self.tr('Status:')))
+        self.status_filter = QtWidgets.QComboBox()
+        self.status_filter.addItem(self.tr('All'), 'all')
+        self.status_filter.addItem(self.tr('Loaded'), 'loaded')
+        self.status_filter.addItem(self.tr('Unloaded'), 'unloaded')
+        self.status_filter.currentIndexChanged.connect(self.refresh)
+        filters.addWidget(self.status_filter)
+        layout.addLayout(filters)
+
+        self.image_grid = QtWidgets.QTableWidget(0, 4)
+        self.image_grid.setHorizontalHeaderLabels(
+            [self.tr('Name'), self.tr('Filename'), self.tr('Status'),
+             self.tr('Preview')])
+        self.image_grid.setSelectionMode(
+            QtWidgets.QAbstractItemView.SelectionMode.ExtendedSelection)
+        self.image_grid.setSelectionBehavior(
+            QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
+        self.image_grid.setSortingEnabled(True)
+        self.image_grid.setEditTriggers(
+            QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
+        header = self.image_grid.horizontalHeader()
+        assert header is not None
+        header.setStretchLastSection(True)
+        header.setSortIndicator(1, QtCore.Qt.SortOrder.AscendingOrder)
+        header.sortIndicatorChanged.connect(self.on_sort_changed)
+        self.image_grid.itemSelectionChanged.connect(
+            self.on_selection_changed)
+        layout.addWidget(self.image_grid)
+        pagination = QtWidgets.QHBoxLayout()
+        self.previous_page_button = QtWidgets.QPushButton(
+            self.tr('Previous'))
+        self.previous_page_button.clicked.connect(self.previous_page)
+        pagination.addWidget(self.previous_page_button)
+        pagination.addWidget(QtWidgets.QLabel(self.tr('Page:')))
+        self.page_number_input = QtWidgets.QSpinBox()
+        self.page_number_input.setRange(1, 1)
+        self.page_number_input.valueChanged.connect(self.on_page_changed)
+        pagination.addWidget(self.page_number_input)
+        self.page_label = QtWidgets.QLabel()
+        pagination.addWidget(self.page_label)
+        self.next_page_button = QtWidgets.QPushButton(self.tr('Next'))
+        self.next_page_button.clicked.connect(self.next_page)
+        pagination.addWidget(self.next_page_button)
+        pagination.addStretch()
+        pagination.addWidget(QtWidgets.QLabel(self.tr('Images per page:')))
+        self.page_size_input = QtWidgets.QSpinBox()
+        self.page_size_input.setRange(1, 10000)
+        self.page_size_input.setValue(self.page_size)
+        self.page_size_input.valueChanged.connect(self.on_page_size_changed)
+        pagination.addWidget(self.page_size_input)
+        layout.addLayout(pagination)
+        # Keep the old attribute available to integrations using the dialog.
+        self.image_list = self.image_grid
+
+        buttons = QtWidgets.QHBoxLayout()
+        self.unload_button = QtWidgets.QPushButton(self.tr('Unload'))
+        self.unload_button.clicked.connect(self.unload_current)
+        self.unload_button.setToolTip(
+            self.tr('Only images loaded from a saved scene can be unloaded.'))
+        buttons.addWidget(self.unload_button)
+        self.reload_button = QtWidgets.QPushButton(self.tr('Reload'))
+        self.reload_button.clicked.connect(self.reload_current)
+        buttons.addWidget(self.reload_button)
+        buttons.addStretch()
+        close_button = QtWidgets.QPushButton(self.tr('Close'))
+        close_button.clicked.connect(self.close)
+        buttons.addWidget(close_button)
+        layout.addLayout(buttons)
+
+        self.refresh()
+        self.show()
+
+    def refresh(self):
+        selected_images = set(self.selected_images())
+        name_query = self.name_filter.text().casefold()
+        filename_query = self.filename_filter.text().casefold()
+        status = self.status_filter.currentData()
+        self.image_items = list(self.scene.items_by_type(
+            'pixmap', include_unloaded=True))
+        self.filtered_images = [
+            item for item in self.image_items
+            if name_query in os.path.basename(item.filename or '').casefold()
+            and filename_query in (item.filename or '').casefold()
+            and (status == 'all'
+                 or status == ('loaded' if item.image_loaded else 'unloaded'))
+        ]
+        column = self.image_grid.horizontalHeader().sortIndicatorSection()
+        order = self.image_grid.horizontalHeader().sortIndicatorOrder()
+        self.filtered_images.sort(
+            key=lambda item: self.sort_value(item, column),
+            reverse=order == QtCore.Qt.SortOrder.DescendingOrder)
+        page_count = self.page_count()
+        self.current_page = min(self.current_page, page_count - 1)
+        start = self.current_page * self.page_size
+        page_images = self.filtered_images[start:start + self.page_size]
+
+        self.image_grid.blockSignals(True)
+        self.image_grid.setSortingEnabled(False)
+        self.image_grid.setRowCount(0)
+        for row, item in enumerate(page_images):
+            filename = item.filename or self.tr('(unnamed image)')
+
+            if item.filename:
+                name = os.path.basename(item.filename)
+            else:
+                name = filename
+
+            item_status = (self.tr('Loaded') if item.image_loaded
+                           else self.tr('Unloaded'))
+            self.image_grid.insertRow(row)
+            name_item = QtWidgets.QTableWidgetItem(name)
+            name_item.setData(QtCore.Qt.ItemDataRole.UserRole, id(item))
+            filename_item = QtWidgets.QTableWidgetItem(filename)
+            filename_item.setData(QtCore.Qt.ItemDataRole.UserRole, id(item))
+            state = QtWidgets.QTableWidgetItem(item_status)
+            state.setData(QtCore.Qt.ItemDataRole.UserRole, id(item))
+            preview = QtWidgets.QLabel()
+            preview.setPixmap(self.image_icon(item).pixmap(
+                QtCore.QSize(48, 48)))
+            preview.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+            self.image_grid.setItem(row, 0, name_item)
+            self.image_grid.setItem(row, 1, filename_item)
+            self.image_grid.setItem(row, 2, state)
+            self.image_grid.setCellWidget(row, 3, preview)
+            if item in selected_images:
+                self.image_grid.selectRow(row)
+        self.image_grid.setSortingEnabled(True)
+        self.image_grid.blockSignals(False)
+        self.page_number_input.blockSignals(True)
+        self.page_number_input.setRange(1, page_count)
+        self.page_number_input.setValue(self.current_page + 1)
+        self.page_number_input.blockSignals(False)
+        self.page_label.setText(self.tr('of %1').replace(
+            '%1', str(page_count)))
+        self.previous_page_button.setEnabled(self.current_page > 0)
+        self.next_page_button.setEnabled(self.current_page < page_count - 1)
+        self.on_selection_changed()
+
+    def sort_value(self, item, column):
+        if column == 0:
+            return os.path.basename(item.filename or '').casefold()
+        if column == 1:
+            return (item.filename or '').casefold()
+        return 1 if item.image_loaded else 0
+
+    def image_icon(self, item):
+        """Create a small preview without retaining the full image."""
+        pixmap = QtGui.QPixmap()
+        if item.image_loaded:
+            candidate = item.pixmap()
+            if isinstance(candidate, QtGui.QPixmap):
+                pixmap = candidate
+        elif (item.save_id is not None
+              and item.image_source is not None
+              and os.path.isfile(item.image_source)):
+            image_data = fileio.load_image_data(
+                item.image_source, item.save_id)
+            if image_data:
+                image = QtGui.QImage.fromData(image_data)
+                pixmap = QtGui.QPixmap.fromImage(image)
+
+        if pixmap.isNull():
+            return QtGui.QIcon()
+        thumbnail = pixmap.scaled(
+            QtCore.QSize(48, 48),
+            QtCore.Qt.AspectRatioMode.KeepAspectRatio,
+            QtCore.Qt.TransformationMode.SmoothTransformation)
+        return QtGui.QIcon(thumbnail)
+
+    def on_sort_changed(self, column, order):
+        self.refresh()
+
+    def set_page(self, page):
+        page_count = self.page_count()
+        self.current_page = max(0, min(page, page_count - 1))
+        self.refresh()
+
+    def page_count(self):
+        return max(
+            1, (len(self.filtered_images) + self.page_size - 1)
+            // self.page_size)
+
+    def on_page_changed(self, page):
+        self.set_page(page - 1)
+
+    def on_page_size_changed(self, page_size):
+        self.page_size = page_size
+        self.current_page = 0
+        self.refresh()
+
+    def previous_page(self):
+        self.set_page(self.current_page - 1)
+
+    def next_page(self):
+        self.set_page(self.current_page + 1)
+
+    def selected_images(self):
+        item_by_id = {id(item): item for item in self.image_items}
+        rows = {index.row() for index in self.image_grid.selectedIndexes()}
+        return [
+            item_by_id[self.image_grid.item(row, 0).data(
+                QtCore.Qt.ItemDataRole.UserRole)]
+            for row in rows
+        ]
+
+    def on_selection_changed(self):
+        images = self.selected_images()
+        saved_scene = bool(getattr(self.parent(), 'filename', None))
+        self.unload_button.setEnabled(
+            saved_scene and
+            any(item.image_loaded
+                and item.save_id is not None
+                and item.image_source is not None
+                for item in images))
+        self.reload_button.setEnabled(
+            saved_scene and
+            any(not item.image_loaded
+                and item.save_id is not None
+                and item.image_source is not None
+                for item in images))
+
+    def unload_current(self):
+        command = commands.ChangeImageLoadState(
+            self.selected_images(), unload=True)
+        if command.items:
+            self.start_image_load_state(command)
+
+    def reload_current(self):
+        command = commands.ChangeImageLoadState(
+            self.selected_images(), unload=False)
+        if command.items:
+            self.start_image_load_state(command)
+
+    def start_image_load_state(self, command):
+        self.worker = fileio.ThreadedIO(
+            fileio.prepare_image_load_state,
+            command.items, command.unload)
+        self.worker.finished.connect(
+            partial(self.on_image_load_state_finished, command))
+        self.progress = BuzzProgressDialog(
+            self.tr('Unloading images' if command.unload
+                    else 'Reloading images'),
+            worker=self.worker,
+            parent=self)
+        self.worker.start()
+
+    def on_image_load_state_finished(self, command, filename, errors):
+        if errors or self.worker.canceled:
+            if errors:
+                QtWidgets.QMessageBox.warning(
+                    self,
+                    self.tr('Problem changing image state'),
+                    self.tr('Some images could not be processed.'))
+            return
+        command.image_data = getattr(self.worker, 'image_data', {})
+        command.redo()
+        command.ignore_first_redo = True
+        self.scene.undo_stack.push(command)
+        self.refresh()
 
 
 class ChangeWindowOpacityDialog(QtWidgets.QDialog):

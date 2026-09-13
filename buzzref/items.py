@@ -118,6 +118,8 @@ class BuzzPixmapItem(BuzzItemMixin, QtWidgets.QGraphicsPixmapItem):
         super().__init__(QtGui.QPixmap.fromImage(image))
         self.save_id = None
         self.filename = filename
+        self.image_source = None
+        self.image_scene = None
         self.reset_crop()
         logger.debug(f'Initialized {self}')
         self.is_image = True
@@ -226,13 +228,16 @@ class BuzzPixmapItem(BuzzItemMixin, QtWidgets.QGraphicsPixmapItem):
             return self.crop
 
     def get_extra_save_data(self):
-        return {'filename': self.filename,
+        data = {'filename': self.filename,
                 'opacity': self.opacity(),
                 'grayscale': self.grayscale,
                 'crop': [self.crop.topLeft().x(),
                          self.crop.topLeft().y(),
                          self.crop.width(),
                          self.crop.height()]}
+        if self.image_scene is not None and not self.image_loaded:
+            data['unloaded'] = True
+        return data
 
     def get_filename_for_export(self, imgformat, save_id_default=None):
         save_id = self.save_id or save_id_default
@@ -287,6 +292,59 @@ class BuzzPixmapItem(BuzzItemMixin, QtWidgets.QGraphicsPixmapItem):
         pixmap = QtGui.QPixmap()
         pixmap.loadFromData(data)
         self.setPixmap(pixmap)
+
+    @property
+    def image_loaded(self):
+        """Whether the image pixels are currently held by the item."""
+        return not self.pixmap().isNull()
+
+    def unload_image(self):
+        """Release the pixmap so it can be restored from the scene file."""
+        if not self.image_loaded:
+            return False
+        if self.save_id is None or self.image_source is None:
+            logger.warning(
+                f'Cannot unload unsaved image without a scene file: {self}')
+            return False
+
+        crop = QtCore.QRectF(self.crop)
+        scene = self.scene()
+        if scene is None:
+            return False
+        self.image_scene = scene
+        scene.unloaded_items.append(self)
+        scene.removeItem(self)
+        QtWidgets.QGraphicsPixmapItem.setPixmap(self, QtGui.QPixmap())
+        self._crop = crop
+        self._grayscale_pixmap = None
+        self.update()
+        return True
+
+    def reload_image(self, image_data=None):
+        """Restore pixels by reading them from the scene file."""
+        if self.save_id is None or self.image_source is None:
+            return False
+        if self.image_loaded:
+            return True
+
+        if image_data is None:
+            from buzzref.fileio.sql import load_image_data
+            image_data = load_image_data(self.image_source, self.save_id)
+        if image_data is None:
+            logger.warning(
+                f'Could not reload image {self.save_id} from '
+                f'{self.image_source}')
+            return False
+
+        crop = QtCore.QRectF(self.crop)
+        self.pixmap_from_bytes(image_data)
+        self._crop = crop
+        if self.image_scene is not None and self.scene() is None:
+            if self in self.image_scene.unloaded_items:
+                self.image_scene.unloaded_items.remove(self)
+            self.image_scene.addItem(self)
+        self.update()
+        return True
 
     def create_copy(self):
         item = BuzzPixmapItem(QtGui.QImage(), self.filename)

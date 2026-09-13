@@ -22,6 +22,7 @@ from buzzref.fileio.errors import BuzzFileIOError
 from buzzref.fileio.image import load_image
 from buzzref.fileio.pureref import PureRefIO
 from buzzref.fileio.sql import SQLiteIO, is_bee_file
+from buzzref.fileio.sql import load_image_data
 from buzzref.items import BuzzPixmapItem
 
 
@@ -87,6 +88,32 @@ def load_images(filenames, pos, scene, worker):
 
     scene.undo_stack.push(
         commands.InsertItems(scene, items, ignore_first_redo=True))
+    worker.finished.emit('', errors)
+
+
+def prepare_image_load_state(items, unload, worker):
+    """Read image bytes needed for an asynchronous load-state change."""
+    worker.begin_processing.emit(len(items))
+    image_data = {}
+    errors = []
+    if not unload:
+        for index, item in enumerate(items):
+            try:
+                data = load_image_data(item.image_source, item.save_id)
+            except Exception as error:
+                logger.exception('Could not read image data')
+                data = None
+                errors.append(str(error))
+            if data is None:
+                errors.append(
+                    f'Image {item.save_id} could not be found in scene file')
+            if data is not None:
+                image_data[id(item)] = data
+            worker.progress.emit(index)
+            if worker.canceled:
+                break
+            worker.msleep(10)
+    worker.image_data = image_data
     worker.finished.emit('', errors)
 
 

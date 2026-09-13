@@ -76,6 +76,7 @@ Features
 * Add text notes
 * Enable always-on-top-mode and disable the title bar to let the window unobtrusively float above your art program
 * **NEW** Adjust opacity of window background (View -> Window Opacity)
+* **NEW** Hide/show selected images without removing (Images -> Images list...)
 
 
 Regarding the bee file format

@@ -3,12 +3,14 @@ from unittest.mock import patch, MagicMock
 from PyQt6 import QtCore, QtWidgets, QtGui
 from PyQt6.QtCore import Qt
 
+from buzzref import commands
 from buzzref.config import logfile_name
 from buzzref.widgets import (
     BuzzNotification,
     ChangeOpacityDialog,
     DebugLogDialog,
     ExportImagesFileExistsDialog,
+    ImagesDialog,
     SampleColorWidget,
     SceneToPixmapExporterDialog,
 )
@@ -99,6 +101,229 @@ def test_change_opacity_dialog_reject(view, item):
     dlg.reject()
     assert item.opacity() == 0.6
     assert len(stack) == 0
+
+
+def test_images_dialog_can_unload_and_reload_multiple_images(view, qtbot):
+    view.filename = 'scene.bee'
+    images = []
+    for loaded in (True, True, False):
+        image = MagicMock(
+            filename=f'image-{len(images)}.png',
+            image_loaded=loaded,
+            save_id=len(images),
+            image_source='scene.bee',
+        )
+        image.unload_image.return_value = loaded
+        image.reload_image.return_value = not loaded
+        images.append(image)
+
+    scene = MagicMock()
+    scene.items_by_type.return_value = images
+    dialog = ImagesDialog(view, scene)
+
+    dialog.image_grid.selectRow(0)
+    dialog.image_grid.selectionModel().select(
+        dialog.image_grid.model().index(1, 0),
+        QtCore.QItemSelectionModel.SelectionFlag.Select
+        | QtCore.QItemSelectionModel.SelectionFlag.Rows)
+    assert dialog.unload_button.isEnabled()
+    dialog.unload_current()
+    qtbot.waitUntil(lambda: images[0].unload_image.called)
+    command = scene.undo_stack.push.call_args.args[0]
+    assert isinstance(command, commands.ChangeImageLoadState)
+    images[0].unload_image.assert_called_once_with()
+    images[1].unload_image.assert_called_once_with()
+
+    dialog.image_grid.clearSelection()
+    dialog.image_grid.selectRow(2)
+    with patch('buzzref.fileio.load_image_data', return_value=b'data'):
+        dialog.reload_current()
+        qtbot.waitUntil(lambda: images[2].reload_image.called)
+    command = scene.undo_stack.push.call_args.args[0]
+    assert isinstance(command, commands.ChangeImageLoadState)
+    images[2].reload_image.assert_called_once_with(b'data')
+
+
+def test_images_dialog_filters_by_filename_and_status(view):
+    images = []
+    for filename, loaded in (('alpha.png', True), ('beta.png', False)):
+        image = MagicMock(
+            filename=filename,
+            image_loaded=loaded,
+            save_id=1,
+            image_source='scene.bee',
+        )
+        images.append(image)
+
+    scene = MagicMock()
+    scene.items_by_type.return_value = images
+    dialog = ImagesDialog(view, scene)
+
+    dialog.filename_filter.setText('alpha')
+    assert dialog.image_grid.rowCount() == 1
+    assert dialog.image_grid.item(0, 1).text() == 'alpha.png'
+
+    dialog.filename_filter.clear()
+    dialog.status_filter.setCurrentIndex(2)
+    assert dialog.image_grid.rowCount() == 1
+    assert dialog.image_grid.item(0, 1).text() == 'beta.png'
+
+
+def test_images_dialog_name_column_is_sortable_and_filterable(view):
+    images = []
+    for filename in ('/tmp/zeta.png', '/tmp/alpha.png'):
+        image = MagicMock(
+            filename=filename,
+            image_loaded=True,
+            save_id=1,
+            image_source='scene.bee',
+        )
+        images.append(image)
+
+    scene = MagicMock()
+    scene.items_by_type.return_value = images
+    dialog = ImagesDialog(view, scene)
+
+    assert dialog.image_grid.columnCount() == 4
+    assert dialog.image_grid.horizontalHeaderItem(0).text() == 'Name'
+    assert dialog.image_grid.horizontalHeaderItem(3).text() == 'Preview'
+    dialog.image_grid.sortItems(0, QtCore.Qt.SortOrder.AscendingOrder)
+    assert dialog.image_grid.item(0, 0).text() == 'alpha.png'
+    dialog.filename_filter.setText('zeta.png')
+    assert dialog.image_grid.rowCount() == 1
+    assert dialog.image_grid.item(0, 0).text() == 'zeta.png'
+
+
+def test_images_dialog_preview_uses_downscaled_image(view):
+    image = QtGui.QImage(200, 100, QtGui.QImage.Format.Format_RGB32)
+    image.fill(QtGui.QColor('red'))
+    pixmap = QtGui.QPixmap.fromImage(image)
+    item = MagicMock(
+        filename='/tmp/image.png',
+        image_loaded=True,
+        save_id=1,
+        image_source='scene.bee',
+    )
+    item.pixmap.return_value = pixmap
+
+    scene = MagicMock()
+    scene.items_by_type.return_value = [item]
+    dialog = ImagesDialog(view, scene)
+
+    preview = dialog.image_grid.cellWidget(0, 3)
+    assert isinstance(preview, QtWidgets.QLabel)
+    assert preview.pixmap() is not None
+    assert preview.pixmap().isNull() is False
+    assert preview.pixmap().size() == QtCore.QSize(48, 24)
+
+
+def test_images_dialog_filters_by_name(view):
+    images = []
+    for filename in ('/tmp/alpha.png', '/tmp/beta.png'):
+        images.append(MagicMock(
+            filename=filename,
+            image_loaded=True,
+            save_id=1,
+            image_source='scene.bee',
+        ))
+
+    scene = MagicMock()
+    scene.items_by_type.return_value = images
+    dialog = ImagesDialog(view, scene)
+
+    dialog.name_filter.setText('beta')
+
+    assert dialog.image_grid.rowCount() == 1
+    assert dialog.image_grid.item(0, 0).text() == 'beta.png'
+
+
+def test_images_dialog_disables_load_actions_for_new_scene(view):
+    images = [MagicMock(
+        filename='image.png',
+        image_loaded=True,
+        save_id=1,
+        image_source='scene.bee',
+    )]
+    scene = MagicMock()
+    scene.items_by_type.return_value = images
+    dialog = ImagesDialog(view, scene)
+    dialog.image_grid.selectRow(0)
+
+    assert dialog.unload_button.isEnabled() is False
+    assert dialog.reload_button.isEnabled() is False
+
+
+def test_images_dialog_paginates_images(view):
+    images = [
+        MagicMock(
+            filename=f'image-{index:03}.png',
+            image_loaded=True,
+            save_id=index,
+            image_source='scene.bee',
+        )
+        for index in range(3)
+    ]
+    scene = MagicMock()
+    scene.items_by_type.return_value = images
+    dialog = ImagesDialog(view, scene)
+    dialog.page_size = 2
+    dialog.refresh()
+
+    assert dialog.image_grid.rowCount() == 2
+    assert dialog.page_number_input.value() == 1
+    assert dialog.page_label.text() == 'of 2'
+    assert dialog.previous_page_button.isEnabled() is False
+    assert dialog.next_page_button.isEnabled() is True
+
+    dialog.next_page()
+    assert dialog.image_grid.rowCount() == 1
+    assert dialog.page_number_input.value() == 2
+    assert dialog.page_label.text() == 'of 2'
+    assert dialog.previous_page_button.isEnabled() is True
+    assert dialog.next_page_button.isEnabled() is False
+
+
+def test_images_dialog_page_size_is_customizable(view):
+    images = [
+        MagicMock(
+            filename=f'image-{index:03}.png',
+            image_loaded=True,
+            save_id=index,
+            image_source='scene.bee',
+        )
+        for index in range(3)
+    ]
+    scene = MagicMock()
+    scene.items_by_type.return_value = images
+    dialog = ImagesDialog(view, scene)
+
+    dialog.page_size_input.setValue(1)
+
+    assert dialog.page_size == 1
+    assert dialog.image_grid.rowCount() == 1
+    assert dialog.page_number_input.value() == 1
+    assert dialog.page_label.text() == 'of 3'
+
+
+def test_images_dialog_can_set_page_number(view):
+    images = [
+        MagicMock(
+            filename=f'image-{index:03}.png',
+            image_loaded=True,
+            save_id=index,
+            image_source='scene.bee',
+        )
+        for index in range(3)
+    ]
+    scene = MagicMock()
+    scene.items_by_type.return_value = images
+    dialog = ImagesDialog(view, scene)
+    dialog.page_size_input.setValue(1)
+
+    dialog.page_number_input.setValue(3)
+
+    assert dialog.current_page == 2
+    assert dialog.image_grid.item(0, 0).text() == 'image-002.png'
 
 
 @patch('PyQt6.QtCore.QTimer.singleShot')

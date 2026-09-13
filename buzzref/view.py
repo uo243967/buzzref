@@ -90,7 +90,7 @@ class BuzzGraphicsView(MainControlsMixin,
         self.capture_start_pos = None
         self.capture_rubberband = None
 
-        self.scene = BuzzGraphicsScene(self.undo_stack)
+        self.scene: BuzzGraphicsScene = BuzzGraphicsScene(self.undo_stack)
         self.scene.changed.connect(self.on_scene_changed)
         self.scene.selectionChanged.connect(self.on_selection_changed)
         self.scene.cursor_changed.connect(self.on_cursor_changed)
@@ -124,6 +124,10 @@ class BuzzGraphicsView(MainControlsMixin,
     def filename(self, value):
         self._filename = value
         self.update_window_title()
+        if hasattr(self, 'bee_actiongroups'):
+            self.actiongroup_set_enabled(
+                'active_when_saved_selection',
+                bool(value) and self.scene.has_selection())
         if value:
             self.settings.update_recent_files(value)
             self.update_menu_and_actions()
@@ -171,7 +175,7 @@ class BuzzGraphicsView(MainControlsMixin,
     def on_scene_changed(self, region):
         if sip.isdeleted(self.scene):
             return
-        if not self.scene.items():
+        if not self.scene.items() and not self.scene.unloaded_items:
             logger.debug('No items in scene')
             self.setTransform(QtGui.QTransform())
             self.welcome_overlay.setFocus()
@@ -410,6 +414,46 @@ class BuzzGraphicsView(MainControlsMixin,
         if images:
             self.undo_stack.push(
                 commands.ToggleGrayscale(images, checked))
+
+    def on_action_list_images(self):
+        widgets.ImagesDialog(self, self.scene)
+
+    def on_action_unload_selected_images(self):
+        if not self.filename:
+            return
+        images = [
+            item for item in self.scene.selectedItems(user_only=True)
+            if getattr(item, 'is_image', False)
+        ]
+        command = commands.ChangeImageLoadState(images, unload=True)
+        if command.items:
+            self._start_image_load_state(command)
+
+    def _start_image_load_state(self, command):
+        self.worker = fileio.ThreadedIO(
+            fileio.prepare_image_load_state,
+            command.items, command.unload)
+        self.worker.finished.connect(
+            partial(self._on_image_load_state_finished, command))
+        self.progress = widgets.BuzzProgressDialog(
+            self.tr('Unloading images' if command.unload
+                    else 'Reloading images'),
+            worker=self.worker,
+            parent=self)
+        self.worker.start()
+
+    def _on_image_load_state_finished(self, command, filename, errors):
+        if errors or self.worker.canceled:
+            if errors:
+                QtWidgets.QMessageBox.warning(
+                    self,
+                    self.tr('Problem changing image state'),
+                    self.tr('Some images could not be processed.'))
+            return
+        command.image_data = getattr(self.worker, 'image_data', {})
+        command.redo()
+        command.ignore_first_redo = True
+        self.undo_stack.push(command)
 
     def on_action_crop(self):
         self.scene.crop_items()
@@ -871,6 +915,9 @@ class BuzzGraphicsView(MainControlsMixin,
 
     def on_saving_finished(self, filename, errors):
         if errors:
+            for item in getattr(self, '_save_as_unloaded_items', []):
+                item.unload_image()
+            self._save_as_unloaded_items = []
             QtWidgets.QMessageBox.warning(
                 self,
                 self.tr('Problem saving file'),
@@ -878,11 +925,32 @@ class BuzzGraphicsView(MainControlsMixin,
                         '<p>File/directory not accessible</p>') % filename)
         else:
             self.filename = filename
+            for item in self.scene.items_by_type(
+                    'pixmap', include_unloaded=True):
+                item.image_source = filename
+            for item in getattr(self, '_save_as_unloaded_items', []):
+                item.unload_image()
+            self._save_as_unloaded_items = []
             self.undo_stack.setClean()
 
     def do_save(self, filename, create_new):
         if not fileio.is_bee_file(filename):
             filename = f'{filename}.bee'
+        if create_new:
+            self._save_as_unloaded_items = [
+                item for item in self.scene.items_by_type(
+                    'pixmap', include_unloaded=True)
+                if not item.image_loaded
+            ]
+            for item in self.scene.items_by_type(
+                    'pixmap', include_unloaded=True):
+                if not item.image_loaded and not item.reload_image():
+                    QtWidgets.QMessageBox.warning(
+                        self,
+                        self.tr('Problem saving file'),
+                        self.tr('An unloaded image could not be reloaded.'))
+                    self._save_as_unloaded_items = []
+                    return
         self.worker = fileio.ThreadedIO(
             fileio.save_bee, filename, self.scene, create_new=create_new)
         self.worker.finished.connect(self.on_saving_finished)
@@ -1144,6 +1212,9 @@ class BuzzGraphicsView(MainControlsMixin,
                      len(self.scene.selectedItems(user_only=True)))
         self.actiongroup_set_enabled('active_when_selection',
                                      self.scene.has_selection())
+        self.actiongroup_set_enabled(
+            'active_when_saved_selection',
+            bool(self.filename) and self.scene.has_selection())
         self.actiongroup_set_enabled('active_when_single_image',
                                      self.scene.has_single_image_selection())
 

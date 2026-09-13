@@ -583,6 +583,33 @@ def test_sqliteio_read_reads_readonly_pixmap_item(tmpfile, view, imgdata3x3):
     assert view.scene.items_to_add.empty() is True
 
 
+def test_sqliteio_read_preserves_unloaded_pixmap_item(
+        tmpfile, view, imgdata3x3):
+    io = SQLiteIO(tmpfile, view.scene, create_new=True)
+    io.create_schema_on_new()
+    io.ex(
+        'INSERT INTO items '
+        '(type, x, y, z, scale, rotation, flip, data) '
+        'VALUES (?, ?, ?, ?, ?, ?, ?, ?) ',
+        ('pixmap', 22.2, 33.3, 0.22, 3.4, 45, -1,
+         json.dumps({'filename': 'bee.png', 'unloaded': True})))
+    io.ex('INSERT INTO sqlar (item_id, data) VALUES (?, ?)',
+          (1, imgdata3x3))
+    io.connection.commit()
+    del io
+
+    io = SQLiteIO(tmpfile, view.scene, readonly=True)
+    io.read()
+    view.scene.add_queued_items()
+
+    assert view.scene.items() == []
+    assert len(view.scene.unloaded_items) == 1
+    item = view.scene.unloaded_items[0]
+    assert item.image_loaded is False
+    assert item.image_source == tmpfile
+    assert item.save_id == 1
+
+
 def test_sqliteio_read_reads_readonly_pixmap_item_error(tmpfile, view):
     io = SQLiteIO(tmpfile, view.scene, create_new=True)
     io.create_schema_on_new()

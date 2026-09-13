@@ -73,6 +73,36 @@ def test_on_scene_changed_when_no_items(show_mock, view):
         assert view.get_scale() == 1
 
 
+def test_unload_selected_images(view, qtbot):
+    view.filename = 'scene.bee'
+    loaded = MagicMock(is_image=True, image_loaded=True)
+    unloaded = MagicMock(is_image=True, image_loaded=True)
+    text = MagicMock(is_image=False)
+    view.scene.selectedItems = MagicMock(
+        return_value=[loaded, unloaded, text])
+
+    view.on_action_unload_selected_images()
+
+    qtbot.waitUntil(lambda: loaded.unload_image.called)
+    loaded.unload_image.assert_called_once_with()
+    unloaded.unload_image.assert_called_once_with()
+    text.unload_image.assert_not_called()
+    view.undo_stack.undo()
+    loaded.reload_image.assert_called_once_with()
+    unloaded.reload_image.assert_called_once_with()
+    view.undo_stack.redo()
+    assert loaded.unload_image.call_count == 2
+    assert unloaded.unload_image.call_count == 2
+
+
+def test_unload_selected_images_shortcut(qapp):
+    assert get_actions()['unload_selected_images'].shortcuts == ['U']
+
+
+def test_unload_selected_images_disabled_for_new_scene(view):
+    assert get_actions()['unload_selected_images'].qaction.isEnabled() is False
+
+
 def test_get_supported_image_formats_for_reading(view):
     formats = view.get_supported_image_formats(QtGui.QImageReader)
     assert '*.png' in formats
