@@ -225,7 +225,8 @@ class SceneToPixmapExporterDialog(QtWidgets.QDialog):
 
 class ChangeOpacityDialog(QtWidgets.QDialog):
 
-    def __init__(self, parent, images: list[QtWidgets.QGraphicsItem], undo_stack):
+    def __init__(self, parent, images: list[QtWidgets.QGraphicsItem],
+                 undo_stack):
         super().__init__(parent)
         self.undo_stack = undo_stack
         self.images = images
@@ -401,7 +402,12 @@ class ImagesDialog(QtWidgets.QDialog):
         self.image_grid.setRowCount(0)
         for row, item in enumerate(page_images):
             filename = item.filename or self.tr('(unnamed image)')
-            name = os.path.basename(item.filename) if item.filename else filename
+
+            if item.filename:
+                name = os.path.basename(item.filename)
+            else:
+                name = filename
+
             item_status = (self.tr('Loaded') if item.image_loaded
                            else self.tr('Unloaded'))
             self.image_grid.insertRow(row)
@@ -475,12 +481,14 @@ class ImagesDialog(QtWidgets.QDialog):
         images = self.selected_images()
         saved_scene = bool(getattr(self.parent(), 'filename', None))
         self.unload_button.setEnabled(
-            saved_scene and any(item.image_loaded
+            saved_scene and
+            any(item.image_loaded
                 and item.save_id is not None
                 and item.image_source is not None
                 for item in images))
         self.reload_button.setEnabled(
-            saved_scene and any(not item.image_loaded
+            saved_scene and
+            any(not item.image_loaded
                 and item.save_id is not None
                 and item.image_source is not None
                 for item in images))

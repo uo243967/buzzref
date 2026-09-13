@@ -281,11 +281,12 @@ def test_pixmap_from_bytes(qapp, item, imgfilename3x3):
 
 @patch('buzzref.fileio.sql.load_image_data')
 def test_unload_and_reload_image_preserves_crop(
-        load_image_data, qapp, imgfilename3x3):
+        load_image_data, view, imgfilename3x3):
     item = BuzzPixmapItem(QtGui.QImage(imgfilename3x3), imgfilename3x3)
     item.save_id = 42
     item.image_source = 'scene.bee'
     item.crop = QtCore.QRectF(0, 0, 2, 2)
+    view.scene.addItem(item)
     with open(imgfilename3x3, 'rb') as image_file:
         load_image_data.return_value = image_file.read()
 
