@@ -81,6 +81,7 @@ class BuzzGraphicsView(MainControlsMixin,
         self.filename = None
         self.previous_transform = None
         self.active_mode = None
+        self.ignore_mouse_when_inactive = False
         self.draw_item = None
         self.draw_current_stroke = None
         self.draw_brush_size = 20.0
@@ -316,6 +317,18 @@ class BuzzGraphicsView(MainControlsMixin,
         self.parent.destroy()
         self.parent.create()
         self.parent.show()
+
+    def on_action_ignore_mouse_when_inactive(self, checked):
+        self.ignore_mouse_when_inactive = checked
+        logger.info(
+            'Ignore mouse events when inactive changed to: %s', checked)
+        if checked:
+            always_on_top = get_actions()['always_on_top'].qaction
+            if always_on_top is not None and not always_on_top.isChecked():
+                always_on_top.setChecked(True)
+            else:
+                self.on_action_always_on_top(True)
+        self.parent.set_input_overlay(checked)
 
     def on_action_move_window(self):
         if self.welcome_overlay.isHidden():

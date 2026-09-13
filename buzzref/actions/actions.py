@@ -469,6 +469,12 @@ class ActionsRegistry(QObject):
                 callback='on_action_show_titlebar',
             ),
             Action(
+                id='ignore_mouse_when_inactive',
+                text=self.tr('Ignore Mouse Events When Inactive'),
+                checkable=True,
+                callback='on_action_ignore_mouse_when_inactive',
+            ),
+            Action(
                 id='move_window',
                 text=self.tr('Move &Window'),
                 shortcuts=['Ctrl+M'],

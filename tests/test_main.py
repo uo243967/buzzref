@@ -18,6 +18,23 @@ def test_buzzref_mainwindow_init(show_mock, qapp):
     show_mock.assert_called()
 
 
+def test_buzzref_mainwindow_creates_input_transparent_overlay(main_window):
+    main_window.view.welcome_overlay.hide()
+    main_window.set_input_overlay(True)
+    assert main_window.isHidden()
+    assert main_window.input_overlay is not None
+    assert main_window.input_overlay.windowFlags() & (
+        QtCore.Qt.WindowType.WindowTransparentForInput)
+
+
+def test_buzzref_mainwindow_removes_input_transparent_overlay(main_window):
+    main_window.view.welcome_overlay.hide()
+    main_window.set_input_overlay(True)
+    main_window.set_input_overlay(False)
+    assert main_window.input_overlay is None
+    assert main_window.isVisible()
+
+
 @patch('buzzref.view.BuzzGraphicsView.open_from_file')
 def test_buzzrefapplication_fileopenevent(open_mock, qapp, main_window):
     event = MagicMock()

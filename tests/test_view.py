@@ -949,6 +949,19 @@ def test_on_action_always_on_top_unchecked(
     create_mock.assert_called_once()
 
 
+@patch('buzzref.view.BuzzGraphicsView.on_action_always_on_top')
+def test_on_action_ignore_mouse_when_inactive_enables_always_on_top(
+        always_on_top_mock, view):
+    always_on_top = get_actions()['always_on_top'].qaction
+    always_on_top.blockSignals(True)
+    always_on_top.setChecked(False)
+    with patch.object(view.parent, 'set_input_overlay') as overlay_mock:
+        view.on_action_ignore_mouse_when_inactive(True)
+    assert always_on_top.isChecked()
+    always_on_top_mock.assert_not_called()
+    overlay_mock.assert_called_once_with(True)
+
+
 def test_on_action_show_menubar(view):
     view.toplevel_menus = [QtWidgets.QMenu('Foo')]
     view.on_action_show_menubar(True)

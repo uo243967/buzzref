@@ -22,7 +22,7 @@ import signal
 import sys
 
 from PyQt6 import QtCore, QtWidgets
-from PyQt6.QtCore import QTranslator, QLocale, QLibraryInfo
+from PyQt6.QtCore import QTranslator, QLocale, QLibraryInfo, Qt
 
 from buzzref import constants
 from buzzref.translations import TRANSLATIONS_PATH
@@ -67,9 +67,45 @@ class BuzzRefMainWindow(QtWidgets.QMainWindow):
         self.setCentralWidget(self.view)
         self.view.set_window_opacity(
             self.view.settings.valueOrDefault('View/window_opacity'))
+        self.input_overlay = None
         self.show()
 
+    def set_input_overlay(self, enabled):
+        if not enabled:
+            if self.input_overlay is not None:
+                self.input_overlay.close()
+                self.input_overlay = None
+            self.show()
+            self.raise_()
+            self.activateWindow()
+            logger.info('Mouse input overlay disabled')
+            return
+
+        if self.input_overlay is not None:
+            return
+
+        pixmap = self.grab()
+        overlay = QtWidgets.QLabel()
+        overlay.setWindowFlags(
+            Qt.WindowType.FramelessWindowHint
+            | Qt.WindowType.Tool
+            | Qt.WindowType.WindowDoesNotAcceptFocus
+            | Qt.WindowType.WindowTransparentForInput)
+        overlay.setAttribute(
+            QtCore.Qt.WidgetAttribute.WA_TranslucentBackground)
+        overlay.setPixmap(pixmap)
+        overlay.setGeometry(self.frameGeometry())
+        overlay.show()
+        self.input_overlay = overlay
+        self.hide()
+        logger.info(
+            'Mouse input overlay enabled at %s with size %s',
+            overlay.pos(), overlay.size())
+
     def closeEvent(self, event):
+        if self.input_overlay is not None:
+            self.input_overlay.close()
+            self.input_overlay = None
         geom = self.saveGeometry()
         self.view.settings.setValue('MainWindow/geometry', geom)
         event.accept()
