@@ -30,6 +30,9 @@ Added
 * Added a setting to change the window background opacity. It allows
   users to overlap BuzzRef with other applications and see through it. 
   The setting can be found in: "View -> Window Opacity"
+* Added a setting to unload/reload images of a scene without removing
+  them from the file. This allows to release memory while having an
+  scene opened. The setting can be found in: "Images -> List images..." 
 
 Fixed
 -----
