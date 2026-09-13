@@ -75,16 +75,27 @@ class BuzzRefMainWindow(QtWidgets.QMainWindow):
     def on_application_state_changed(self, state):
         if (state == QtCore.Qt.ApplicationState.ApplicationActive
                 and self.input_overlay is not None):
-            logger.info(
-                'BuzzRef became active; restoring the interactive main '
-                'window')
-            self.view.ignore_mouse_when_inactive = False
-            ignore_action = get_actions()[
-                'ignore_mouse_when_inactive'].qaction
-            ignore_action.blockSignals(True)
-            ignore_action.setChecked(False)
-            ignore_action.blockSignals(False)
-            self.set_input_overlay(False)
+            self.restore_from_input_overlay()
+
+    def event(self, event):
+        if (event.type() == QtCore.QEvent.Type.WindowActivate
+                and self.input_overlay is not None):
+            self.restore_from_input_overlay()
+        return super().event(event)
+
+    def restore_from_input_overlay(self):
+        if self.input_overlay is None:
+            return
+        logger.info(
+            'BuzzRef became active; restoring the interactive main '
+            'window')
+        self.view.ignore_mouse_when_inactive = False
+        ignore_action = get_actions()[
+            'ignore_mouse_when_inactive'].qaction
+        ignore_action.blockSignals(True)
+        ignore_action.setChecked(False)
+        ignore_action.blockSignals(False)
+        self.set_input_overlay(False)
 
     def set_input_overlay(self, enabled):
         if not enabled:
@@ -111,9 +122,11 @@ class BuzzRefMainWindow(QtWidgets.QMainWindow):
         overlay.setAttribute(
             QtCore.Qt.WidgetAttribute.WA_TranslucentBackground)
         overlay.setPixmap(pixmap)
-        overlay.setGeometry(self.frameGeometry())
-        overlay.show()
+        client_origin = self.mapToGlobal(QtCore.QPoint(0, 0))
+        overlay.setGeometry(
+            QtCore.QRect(client_origin, self.size()))
         self.input_overlay = overlay
+        overlay.show()
         self.showMinimized()
         logger.info(
             'Mouse input overlay enabled at %s with size %s; '

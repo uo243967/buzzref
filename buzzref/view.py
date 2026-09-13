@@ -319,15 +319,29 @@ class BuzzGraphicsView(MainControlsMixin,
         self.parent.show()
 
     def on_action_ignore_mouse_when_inactive(self, checked):
+        always_on_top = get_actions()['always_on_top'].qaction
+        if checked and (
+                always_on_top is None or not always_on_top.isChecked()):
+            logger.info(
+                'Ignore mouse events when inactive requires Always on Top')
+            ignore_action = get_actions()[
+                'ignore_mouse_when_inactive'].qaction
+            ignore_action.blockSignals(True)
+            ignore_action.setChecked(False)
+            ignore_action.blockSignals(False)
+            QtWidgets.QMessageBox.information(
+                self.parent,
+                self.tr('Always on Top Required'),
+                self.tr(
+                    'Enable "Always on Top" before enabling "Ignore Mouse '
+                    'Events When Inactive". The overlay must stay above '
+                    'other windows while allowing mouse events to pass '
+                    'through.'))
+            return
+
         self.ignore_mouse_when_inactive = checked
         logger.info(
             'Ignore mouse events when inactive changed to: %s', checked)
-        if checked:
-            always_on_top = get_actions()['always_on_top'].qaction
-            if always_on_top is not None and not always_on_top.isChecked():
-                always_on_top.setChecked(True)
-            else:
-                self.on_action_always_on_top(True)
         self.parent.set_input_overlay(checked)
 
     def on_action_move_window(self):

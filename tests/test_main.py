@@ -28,6 +28,8 @@ def test_buzzref_mainwindow_creates_input_transparent_overlay(main_window):
         QtCore.Qt.WindowType.WindowTransparentForInput)
     assert main_window.input_overlay.windowFlags() & (
         QtCore.Qt.WindowType.WindowStaysOnTopHint)
+    assert main_window.input_overlay.geometry() == QtCore.QRect(
+        main_window.mapToGlobal(QtCore.QPoint(0, 0)), main_window.size())
 
 
 def test_buzzref_mainwindow_removes_input_transparent_overlay(main_window):
@@ -50,6 +52,20 @@ def test_buzzref_mainwindow_restores_when_application_becomes_active(
     assert main_window.input_overlay is None
     assert not main_window.view.ignore_mouse_when_inactive
     assert not get_actions()['ignore_mouse_when_inactive'].qaction.isChecked()
+
+
+def test_buzzref_mainwindow_restores_when_window_is_activated(main_window):
+    main_window.view.welcome_overlay.hide()
+    main_window.set_input_overlay(True)
+    main_window.view.ignore_mouse_when_inactive = True
+    ignore_action = get_actions()['ignore_mouse_when_inactive'].qaction
+    ignore_action.setChecked(True)
+
+    main_window.event(QtCore.QEvent(QtCore.QEvent.Type.WindowActivate))
+
+    assert main_window.input_overlay is None
+    assert not main_window.view.ignore_mouse_when_inactive
+    assert not ignore_action.isChecked()
 
 
 @patch('buzzref.view.BuzzGraphicsView.open_from_file')
