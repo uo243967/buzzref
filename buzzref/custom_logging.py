@@ -14,7 +14,6 @@
 # along with BuzzRef.  If not, see <https://www.gnu.org/licenses/>.
 
 import logging
-import logging.handlers
 import os.path
 
 from PyQt6 import QtCore
