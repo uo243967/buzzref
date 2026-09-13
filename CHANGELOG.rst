@@ -27,12 +27,16 @@ Added
   crop rectagle or double click inside the crop rectangle. Canceling
   the crop operation is now only possible by pressing the escape key.
   (by DarkDefender)
-* Added a setting to change the window background opacity. It allows
+* Added an menu option to change the window background opacity. It allows
   users to overlap BuzzRef with other applications and see through it. 
-  The setting can be found in: "View -> Window Opacity"
-* Added a setting to unload/reload images of a scene without removing
+  The  menu option can be found in: "View -> Window Opacity"
+* Added a menu option to unload/reload images of a scene without removing
   them from the file. This allows to release memory while having an
-  scene opened. The setting can be found in: "Images -> List images..." 
+  scene opened. The  menu option can be found in: "Images -> 
+  List images..."
+* Added a menu option to make the window transparent to mouse events.
+  This allows to interact with programs that are under BuzzRef. The
+  menu option can be found in: "View -> Transparent to mouse events"
 
 Fixed
 -----

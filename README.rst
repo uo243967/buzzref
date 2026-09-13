@@ -77,6 +77,7 @@ Features
 * Enable always-on-top-mode and disable the title bar to let the window unobtrusively float above your art program
 * **NEW** Adjust opacity of window background (View -> Window Opacity)
 * **NEW** Hide/show selected images without removing (Images -> Images list...)
+* **NEW** Allow to make window transparent to mouse events (View -> Transparent to mouse events)
 
 
 Regarding the bee file format
