@@ -81,6 +81,7 @@ class BuzzGraphicsView(MainControlsMixin,
         self.filename = None
         self.previous_transform = None
         self.active_mode = None
+        self.transparent_to_mouse_events = False
         self.draw_item = None
         self.draw_current_stroke = None
         self.draw_brush_size = 20.0
@@ -316,6 +317,32 @@ class BuzzGraphicsView(MainControlsMixin,
         self.parent.destroy()
         self.parent.create()
         self.parent.show()
+
+    def on_action_transparent_to_mouse_events(self, checked):
+        always_on_top = get_actions()['always_on_top'].qaction
+        if checked and (
+                always_on_top is None or not always_on_top.isChecked()):
+            logger.info(
+                '"Transparent to mouse events" requires "Always on Top"')
+            ignore_action = get_actions()[
+                'transparent_to_mouse_events'].qaction
+            ignore_action.blockSignals(True)
+            ignore_action.setChecked(False)
+            ignore_action.blockSignals(False)
+            QtWidgets.QMessageBox.information(
+                self.parent,
+                self.tr('Always on Top Required'),
+                self.tr(
+                    'Enable "Always on Top" before enabling "Transparent '
+                    'to mouse events". The overlay must stay above '
+                    'other windows while allowing mouse events to pass '
+                    'through.'))
+            return
+
+        self.transparent_to_mouse_events = checked
+        logger.info(
+            'Transparent to mouse events changed to: %s', checked)
+        self.parent.set_input_overlay(checked)
 
     def on_action_move_window(self):
         if self.welcome_overlay.isHidden():

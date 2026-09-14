@@ -949,6 +949,30 @@ def test_on_action_always_on_top_unchecked(
     create_mock.assert_called_once()
 
 
+@patch('PyQt6.QtWidgets.QMessageBox.information')
+def test_on_action_transparent_to_mouse_events_requires_always_on_top(
+        information_mock, view):
+    always_on_top = get_actions()['always_on_top'].qaction
+    always_on_top.blockSignals(True)
+    always_on_top.setChecked(False)
+    with patch.object(view.parent, 'set_input_overlay') as overlay_mock:
+        view.on_action_transparent_to_mouse_events(True)
+    assert not get_actions()[
+        'transparent_to_mouse_events'].qaction.isChecked()
+    assert not view.transparent_to_mouse_events
+    overlay_mock.assert_not_called()
+    information_mock.assert_called_once()
+
+
+def test_on_action_transparent_to_mouse_events_with_always_on_top(view):
+    always_on_top = get_actions()['always_on_top'].qaction
+    always_on_top.blockSignals(True)
+    always_on_top.setChecked(True)
+    with patch.object(view.parent, 'set_input_overlay') as overlay_mock:
+        view.on_action_transparent_to_mouse_events(True)
+    overlay_mock.assert_called_once_with(True)
+
+
 def test_on_action_show_menubar(view):
     view.toplevel_menus = [QtWidgets.QMenu('Foo')]
     view.on_action_show_menubar(True)

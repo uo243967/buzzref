@@ -469,6 +469,12 @@ class ActionsRegistry(QObject):
                 callback='on_action_show_titlebar',
             ),
             Action(
+                id='transparent_to_mouse_events',
+                text=self.tr('Transparent to mouse events'),
+                checkable=True,
+                callback='on_action_transparent_to_mouse_events',
+            ),
+            Action(
                 id='move_window',
                 text=self.tr('Move &Window'),
                 shortcuts=['Ctrl+M'],

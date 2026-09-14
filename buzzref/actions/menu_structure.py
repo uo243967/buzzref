@@ -79,6 +79,7 @@ class MenuRegistry(QObject):
                     MENU_SEPARATOR,
                     'fullscreen',
                     'always_on_top',
+                    'transparent_to_mouse_events',
                     'show_scrollbars',
                     'show_menubar',
                     'show_titlebar',
