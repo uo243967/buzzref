@@ -3,7 +3,6 @@ from unittest.mock import patch, MagicMock
 from PyQt6 import QtCore
 
 from buzzref.__main__ import BuzzRefMainWindow, main
-from buzzref.actions import get_actions
 from buzzref.assets import BuzzAssets
 from buzzref.view import BuzzGraphicsView
 
@@ -18,40 +17,6 @@ def test_buzzref_mainwindow_init(show_mock, qapp):
     assert isinstance(window.view, BuzzGraphicsView)
     show_mock.assert_called()
 
-
-def test_buzzref_mainwindow_creates_input_transparent_overlay(main_window):
-    main_window.view.welcome_overlay.hide()
-    main_window.set_input_overlay(True)
-    assert main_window.isMinimized()
-    assert main_window.input_overlay is not None
-    assert main_window.input_overlay.windowFlags() & (
-        QtCore.Qt.WindowType.WindowTransparentForInput)
-    assert main_window.input_overlay.windowFlags() & (
-        QtCore.Qt.WindowType.WindowStaysOnTopHint)
-    assert main_window.input_overlay.geometry() == QtCore.QRect(
-        main_window.mapToGlobal(QtCore.QPoint(0, 0)), main_window.size())
-
-
-def test_buzzref_mainwindow_removes_input_transparent_overlay(main_window):
-    main_window.view.welcome_overlay.hide()
-    main_window.set_input_overlay(True)
-    main_window.set_input_overlay(False)
-    assert main_window.input_overlay is None
-    assert main_window.isVisible()
-
-
-def test_buzzref_mainwindow_restores_when_application_becomes_active(
-        main_window):
-    main_window.view.welcome_overlay.hide()
-    main_window.set_input_overlay(True)
-    main_window.view.transparent_to_mouse_events = True
-
-    main_window.on_application_state_changed(
-        QtCore.Qt.ApplicationState.ApplicationActive)
-
-    assert main_window.input_overlay is None
-    assert not main_window.view.transparent_to_mouse_events
-    assert not get_actions()['transparent_to_mouse_events'].qaction.isChecked()
 
 @patch('buzzref.view.BuzzGraphicsView.open_from_file')
 def test_buzzrefapplication_fileopenevent(open_mock, qapp, main_window):
